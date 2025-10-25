@@ -28,8 +28,7 @@ Follow these steps for all feature development, fixes, and updates:
 
 ### 🔀 Merging to Main
 
-* **Only the Project Lead (Developer 3)** is responsible for merging `dev` &rarr; `main`.
-* This merge is only performed when the `dev` branch is stable and represents a new **demo-ready** version.
+* Merging to main is only performed when the `dev` branch is stable and represents a new **demo-ready** version.
 
 ### 📦 Example Workflow Summary
 
