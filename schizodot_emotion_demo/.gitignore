@@ -1,0 +1,7 @@
+
+/data/
+/datasets/
+ai/emotion/weights/*
+!ai/emotion/weights/.gitkeep
+**/__pycache__/
+external/**/.venv
