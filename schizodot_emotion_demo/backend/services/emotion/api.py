@@ -1,74 +1,46 @@
+# backend/services/emotion/api.py
+
+import os
+from tempfile import NamedTemporaryFile
 
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from .infer import AVEmotion
-import numpy as np
-import tempfile, os
-import cv2
-import soundfile as sf
-import subprocess
+
+from backend.services.emotion.audio_infer import AudioEmotionModel
+from backend.services.emotion.face_infer import FaceEmotionModel
 
 router = APIRouter()
-model = AVEmotion("ai/emotion/weights/av_emotion_best.pt")
 
-def _extract_audio_wav(in_path: str, out_path: str, target_sr: int = 16000):
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", in_path,
-        "-vn",
-        "-ac", "1",
-        "-ar", str(target_sr),
-        out_path
-    ]
-    # Require ffmpeg in the container/host
-    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+audio_model = AudioEmotionModel()
+face_model = FaceEmotionModel()
 
-def _extract_face_frames(in_path: str, stride: int = 2, max_frames: int = 64):
-    cap = cv2.VideoCapture(in_path)
-    frames = []
-    i = 0
-    if not cap.isOpened():
-        return frames
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        if i % stride == 0:
-            # BGR->RGB
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frames.append(frame)
-            if len(frames) >= max_frames:
-                break
-        i += 1
-    cap.release()
-    return frames
 
 @router.post("/emotion/predict")
-async def predict(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith((".mp4", ".mov", ".mkv", ".avi")):
-        raise HTTPException(status_code=400, detail="Upload a video file")
-    with tempfile.TemporaryDirectory() as td:
-        in_path = os.path.join(td, file.filename)
-        with open(in_path, "wb") as f:
-            f.write(await file.read())
+async def predict_emotion(file: UploadFile = File(...)):
+    """
+    Accept one .mp4 video file and return:
+      - audio-based emotion
+      - face-based emotion
+    """
+    filename = file.filename.lower()
+    if not filename.endswith(".mp4"):
+        raise HTTPException(status_code=400, detail="Please upload an .mp4 video file.")
 
-        # Extract audio
-        wav_path = os.path.join(td, "audio.wav")
+    # On Windows, NamedTemporaryFile must use delete=False to avoid locking
+    tmp = NamedTemporaryFile(suffix=".mp4", delete=False)
+    try:
+        # write upload, then close so other libs can read it
+        tmp.write(await file.read())
+        tmp.flush()
+        tmp_path = tmp.name
+        tmp.close()
+
+        # run both models on the same file path
+        audio_out = audio_model.predict_from_path(tmp_path)
+        face_out = face_model.predict_from_video(tmp_path, step=5)
+
+        return {"audio": audio_out, "face": face_out}
+    finally:
         try:
-            _extract_audio_wav(in_path, wav_path, target_sr=16000)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"ffmpeg error: {e}")
-
-        # Read audio
-        audio, sr = sf.read(wav_path, dtype='float32', always_2d=False)
-        if audio.ndim > 1:
-            audio = audio[:, 0]
-
-        # Extract simple RGB frames (face crops recommended in production)
-        frames = _extract_face_frames(in_path)
-
-        # Call model
-        try:
-            out = model.predict(frames, audio, sr)
-        except NotImplementedError as e:
-            raise HTTPException(status_code=501, detail=str(e))
-        return out
+            os.remove(tmp.name)
+        except OSError:
+            pass
