@@ -1,0 +1,143 @@
+# ============================================
+# AI Pipeline Dockerfile
+# ============================================
+# Contains emotion detection and object detection models
+
+# Base image with PyTorch (CPU version for development)
+# For GPU: use pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+FROM python:3.10-slim
+
+# Set metadata
+LABEL maintainer="SchizoDot AI Team"
+LABEL description="AI Pipeline - Emotion & Object Detection Models"
+LABEL version="1.0.0"
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    MODEL_CACHE_DIR=/models \
+    TORCH_HOME=/models/torch \
+    HF_HOME=/models/huggingface
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    ca-certificates \
+    # For OpenCV
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    # For audio processing
+    libsndfile1 \
+    ffmpeg \
+    # Build tools
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create directories
+RUN mkdir -p /app /models /uploads /logs && \
+    useradd -m -u 1000 aiuser && \
+    chown -R aiuser:aiuser /app /models /uploads /logs
+
+WORKDIR /app
+
+# Copy requirements for AI services
+COPY schizodot_emotion_demo/backend/services/emotion/requirements.txt /tmp/emotion-requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/emotion-requirements.txt && \
+    # Additional AI dependencies
+    pip install --no-cache-dir \
+    fastapi==0.120.1 \
+    uvicorn[standard]==0.38.0 \
+    python-multipart==0.0.20 \
+    pillow==10.1.0 \
+    scikit-learn==1.3.2 \
+    && rm /tmp/emotion-requirements.txt
+
+# Copy emotion detection code
+COPY --chown=aiuser:aiuser schizodot_emotion_demo/backend/services/emotion /app/emotion
+
+# Create a simple FastAPI app for the AI service
+RUN echo 'from fastapi import FastAPI, File, UploadFile, HTTPException\n\
+from fastapi.responses import JSONResponse\n\
+import os\n\
+import tempfile\n\
+\n\
+app = FastAPI(title="SchizoDot AI Pipeline")\n\
+\n\
+@app.get("/health")\n\
+async def health():\n\
+    return {"status": "healthy", "service": "ai-pipeline"}\n\
+\n\
+@app.post("/emotion/analyze")\n\
+async def analyze_emotion(file: UploadFile = File(...)):\n\
+    """Analyze emotion from video file"""\n\
+    try:\n\
+        # Save uploaded file temporarily\n\
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:\n\
+            content = await file.read()\n\
+            tmp.write(content)\n\
+            tmp_path = tmp.name\n\
+        \n\
+        # Import emotion models (lazy loading)\n\
+        from emotion.audio_infer import AudioEmotionModel\n\
+        from emotion.face_infer import FaceEmotionModel\n\
+        \n\
+        audio_model = AudioEmotionModel()\n\
+        face_model = FaceEmotionModel()\n\
+        \n\
+        # Run inference\n\
+        audio_result = audio_model.predict_from_path(tmp_path)\n\
+        face_result = face_model.predict_from_video(tmp_path, step=5)\n\
+        \n\
+        # Cleanup\n\
+        os.remove(tmp_path)\n\
+        \n\
+        return {\n\
+            "audio_emotion": audio_result,\n\
+            "face_emotion": face_result,\n\
+            "status": "success"\n\
+        }\n\
+    except Exception as e:\n\
+        return JSONResponse(\n\
+            status_code=500,\n\
+            content={"error": str(e), "status": "failed"}\n\
+        )\n\
+\n\
+@app.post("/object-detection/analyze")\n\
+async def analyze_objects(file: UploadFile = File(...)):\n\
+    """Placeholder for object detection (pill verification)"""\n\
+    # TODO: Integrate actual object detection model\n\
+    return {\n\
+        "pill_detected": True,\n\
+        "hand_detected": True,\n\
+        "face_detected": True,\n\
+        "compliance": True,\n\
+        "confidence": 0.85,\n\
+        "status": "mock_response",\n\
+        "note": "Object detection model to be integrated"\n\
+    }\n' > /app/main.py
+
+# Switch to non-root user
+USER aiuser
+
+# Expose port
+EXPOSE 8001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8001/health || exit 1
+
+# Start the AI service
+CMD ["uvicorn", "main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8001", \
+     "--workers", "2", \
+     "--log-level", "info"]

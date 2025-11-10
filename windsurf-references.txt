@@ -1,0 +1,410 @@
+1) SCHIZODOT AI — PROJECT REFERENCE FOR WINDSURF
+OVERVIEW
+
+Project Context:
+SchizoDot AI is developed for a mental health hackathon aiming to showcase a fully functional end-to-end AI system that connects patient data capture, AI-driven analysis, and clinician insights in real-time. The goal is a working prototype, not a polished product — focus on clarity, robustness, and explainability.
+
+a. PROJECT VISION
+
+SchizoDot AI is a mental health support system designed for schizophrenia therapy monitoring using multimodal AI — combining visual, audio, and textual analysis.
+The aim is to assist clinicians by tracking patient engagement, mood, and medication adherence (pill ingestion).
+
+The system enables:
+
+Patients to submit short daily video/audio recordings via a mobile app (built using Lovable frontend).
+
+AI models to analyze these submissions for emotional tone, facial expressions, and speech features.
+
+Clinicians to view insights through a dashboard and monitor patient trends in real time.
+
+This project’s focus during the hackathon is to:
+
+Deliver a fully functional backend + infrastructure pipeline that demonstrates the full data flow — from media upload to AI inference and clinical data storage — while keeping the frontend simple but integrated.
+
+b. HIGH-LEVEL SYSTEM FLOW
+
+Patient records and uploads an audio or video file from the frontend.
+
+Frontend requests a presigned S3 URL from the backend.
+
+File uploads directly to AWS S3.
+
+Backend receives a confirmation and logs the file info in DynamoDB.
+
+A background worker triggers AI model pipelines for analysis:
+
+Object detection → Verify pill ingestion.
+
+Speech emotion recognition → Detect tone, mood, stress.
+
+LLM analysis → Interpret behavior, summarize clinical insights.
+
+The results are stored back in DynamoDB.
+
+Clinician dashboard fetches and visualizes data.
+
+c. TECHNICAL OVERVIEW
+FRONTEND (Lovable)
+
+Developed using Lovable.dev (no-code React/Next.js builder).
+
+Focused on patient upload page and clinician result dashboard.
+
+Communicates via API calls to FastAPI backend.
+
+Simple and fast: handles file uploads, results viewing, and notifications.
+
+BACKEND (FastAPI)
+
+Core logic, API routing, and integration hub.
+
+Handles:
+
+S3 presigned URL generation
+
+File confirmation logging (DynamoDB)
+
+AI analysis job creation (trigger Bedrock or local models)
+
+Built with:
+
+FastAPI for async web APIs
+
+Pydantic for schema validation
+
+Uvicorn + Gunicorn for serving
+
+Celery or async tasks for background analysis
+
+INFRASTRUCTURE (AWS + Docker)
+
+AWS EC2 runs everything using Docker Compose.
+
+Nginx acts as reverse proxy.
+
+Docker Containers:
+
+fastapi-main: Main API server
+
+ai-pipeline: Object detection & emotion recognition models
+
+worker: Multimodal fusion and LLM processing
+
+AWS Services:
+
+S3 → Media storage
+
+DynamoDB → Metadata + analysis logs
+
+Bedrock → Foundation models (LLM reasoning)
+
+Transcribe (future) → Speech-to-text
+
+CloudWatch → Monitoring and logging
+
+d. WINDSURF’S ROLE IN THIS HACKATHON
+
+Windsurf acts as the infrastructure engineer + backend developer + AI pipeline integrator.
+Your responsibilities include orchestrating all backend logic and ensuring the system runs end-to-end.
+
+Your primary roles:
+
+Infra Builder
+
+Set up Docker architecture (FastAPI, AI models, worker, Nginx).
+
+Manage environment variables and secrets safely.
+
+Configure AWS CLI and credentials.
+
+Ensure all services run under Docker network with smooth internal communication.
+
+Backend Developer
+
+Maintain and extend FastAPI endpoints:
+
+/presign → Request S3 upload URL
+
+/confirm → Log file details
+
+/analyze → Trigger AI analysis pipeline
+
+Ensure clean structure, validation, and error handling.
+
+Integrate Bedrock SDK and AI service calls.
+
+AI Integration Developer
+
+Link inference modules (object detection, emotion recognition, LLM).
+
+Build modular AI pipeline:
+
+Load models via PyTorch or TensorFlow.
+
+Process uploaded file (via S3 download).
+
+Output structured JSON back to DynamoDB.
+
+Design “multimodal fusion” — combine multiple AI outputs (face, speech, LLM text).
+
+Pipeline Automator
+
+Implement background tasks (Celery / Async / Thread workers).
+
+Enable job queue for processing uploads asynchronously.
+
+Manage logging and error reporting.
+
+System Monitor
+
+Use CloudWatch or local logs for debugging.
+
+Track performance and scalability.
+
+Ensure system stability for multiple concurrent uploads.
+
+e. AI COMPONENTS AND WHAT THEY DO
+
+- Object Detection — Pill Intake Verification
+
+Uses a pretrained CNN model (e.g., YOLOv8 or custom PyTorch model).
+
+Detects “pill,” “hand,” and “face” in video frames.
+
+Verifies pill ingestion sequence by analyzing temporal patterns.
+
+Note that this will be developed by other developers, our job is to ensure the integration is smooth.
+
+- Speech Emotion Recognition
+
+Extracts features using Librosa or pyAudioAnalysis.
+
+Predicts emotional state (e.g., calm, anxious, agitated).
+
+Model could be lightweight CNN or GRU for quick inference.
+
+Note that this will be developed by other developers, our job is to ensure the integration is smooth.
+
+- Multimodal Fusion + LLM Analysis
+
+Fuses results from object + emotion modules into a unified “patient insight.”
+
+Uses AWS Bedrock (Claude / Titan / Mistral models) for:
+
+Natural language summarization (“The patient appears compliant and calm.”)
+
+Behavioral trend prediction.
+
+Generating clinician-friendly insights.
+
+f. FRONTEND CONNECTION (Lovable Integration)
+
+Frontend is built using Lovable.dev, which generates React/Next.js applications with minimal configuration.
+Windsurf only needs to expose APIs properly — Lovable will handle:
+
+Calling backend endpoints.
+
+Handling file upload via presigned S3 URL.
+
+Displaying upload status and results from DynamoDB.
+
+Endpoints expected:
+
+POST /api/v1/presign → Generate presigned URL
+
+POST /api/v1/confirm → Log file
+
+POST /api/v1/analyze → Trigger AI pipeline
+
+GET /api/v1/results/{patient_id} → Retrieve analysis
+
+2) CURRENT PROGRESS
+
+The FastAPI backend is fully functional with local testing.
+
+AWS S3 and DynamoDB are configured in us-east-1.
+
+The IAM user schizodot-dev has limited access for S3 and DynamoDB.
+
+Local environment uses Python virtual environment and Docker for backend.
+
+CORS configuration on S3 is working correctly.
+
+The full pipeline from upload → confirm → DynamoDB is verified.
+
+3) NEXT GOALS FOR WINDSURF
+
+Windsurf’s task is to take over the entire project development and integration.
+It must ensure all components are stable, scalable, and properly documented.
+
+Key responsibilities:
+
+a. Backend stabilization
+
+Maintain FastAPI backend with clean structure, error handling, and secure config.
+
+Manage AWS connections (S3, DynamoDB, Bedrock).
+
+Add structured logging and environment configuration.
+
+c. AWS integration
+
+Ensure correct regions (us-east-1).
+
+Manage S3 for media storage and DynamoDB for logs.
+
+Use Bedrock (or mock service) for AI analysis.
+
+Apply least-privilege IAM policies.
+
+d. Containerization and deployment
+
+Use Docker and docker-compose for development.
+
+Prepare an EC2 deployment plan using Nginx reverse proxy and Docker containers.
+
+e. Background worker setup
+
+Prepare a worker container for heavy tasks (e.g., model inference, transcription).
+
+Use Redis or another queue for task management.
+
+f. Bedrock integration
+
+Connect Bedrock for text and audio analysis.
+
+Store AI-generated insights back into DynamoDB.
+
+g. Documentation and CI/CD
+
+Maintain clear README and .env.example.
+
+Add testing and CI workflows.
+
+Document all setup and verification steps.
+
+h. Development Priorities for Hackathon Phase:
+
+- Get the full backend flow working (upload → confirm → log → analyze).
+
+- Connect Bedrock mock to simulate AI inference.
+
+- Expose clean API endpoints for Lovable frontend.
+
+- Add background processing for AI jobs.
+
+- Deploy to EC2 with Docker and Nginx.
+
+📘 Document every tested step and component.
+
+4) SYSTEM ARCHITECTURE SUMMARY
+
+Frontend: Web or mobile interface for upload and visualization.
+
+Backend: FastAPI running inside Docker, handling requests and AWS integration.
+
+AWS Services:
+
+S3 for media file storage.
+
+DynamoDB for structured logging and results.
+
+Bedrock for AI model inference.
+
+Transcribe and CloudWatch (future integration).
+
+Compute Layer: EC2 instance running Nginx and orchestrating Docker containers.
+
+5) DATA FLOW (SIMPLIFIED)
+
+Patient uploads a media file through frontend.
+
+Backend issues a presigned URL (S3 PUT request).
+
+File is uploaded to S3.
+
+Backend confirms the upload and writes a record in DynamoDB.
+
+Optional AI processing (via Bedrock or local mock) runs and stores result in DynamoDB.
+
+Clinician dashboard fetches data for review.
+
+6) INFRASTRUCTURE PLAN
+
+EC2 (Amazon Linux or Ubuntu) runs the system.
+
+Nginx reverse proxy forwards traffic to Docker containers.
+
+Containers include:
+
+FastAPI backend
+
+AI model container (face, pill detection, etc.)
+
+Worker container (transcription, LLM fusion)
+
+Docker network connects all services internally.
+
+7) SECURITY RULES
+
+No secrets or AWS credentials in code or commits.
+
+Environment variables stored in .env file (excluded from git).
+
+Use least-privilege IAM policies for S3, DynamoDB, and Bedrock.
+
+Enable CloudWatch logging for monitoring.
+
+8) TESTING & VERIFICATION
+
+For each change, Windsurf must ensure:
+
+Upload flow works end-to-end.
+
+Uploaded files appear in S3 under correct path.
+
+DynamoDB contains a new record with accurate metadata.
+
+Bedrock call (or mock) returns valid JSON analysis.
+
+Frontend can display result in a readable format.
+
+9) DEVELOPMENT ENVIRONMENT
+
+Python 3.10+ with FastAPI and Uvicorn.
+
+Docker and docker-compose for container management.
+
+AWS CLI configured for us-east-1.
+
+GitHub repo with main (stable) and dev (active) branches.
+
+10) DEPLOYMENT PLAN
+
+Prepare EC2 instance and install Docker + docker-compose.
+
+Clone the GitHub repository.
+
+Run containers using docker-compose.
+
+Nginx listens on port 80 and forwards requests to FastAPI.
+
+System runs continuously with Docker restart policies.
+
+11) SUMMARY: WINDSURF’S MISSION
+
+Windsurf should:
+
+Be the backend and infra brain of SchizoDot AI.
+
+Keep all components connected and consistent with AWS best practices.
+
+Build in a modular, documented, and production-ready manner.
+
+Understand that AI = multiple models + fusion + reasoning — not just LLMs.
+
+Maintain developer clarity so future contributors can extend easily.
+
+Deliver an end-to-end demo for the hackathon that visually proves the data and AI flow.
+
+
