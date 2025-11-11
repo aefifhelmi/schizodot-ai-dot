@@ -30,6 +30,15 @@ class Settings(BaseSettings):
 
     # Internal Services
     AI_PIPELINE_URL: str = "http://ai-pipeline:8001"
+    
+    # Feature Flags for AI Services
+    ENABLE_EMOTION_SERVICE: bool = False  # Toggle for emotion detection
+    ENABLE_COMPLIANCE_SERVICE: bool = False  # Toggle for object detection
+    ENABLE_MULTIMODAL_FUSION: bool = True  # Always enabled (rule-based)
+    
+    # Service Timeouts
+    AI_SERVICE_TIMEOUT: int = 120  # seconds
+    S3_DOWNLOAD_TIMEOUT: int = 300  # seconds
 
     # pydantic v2 config:
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)

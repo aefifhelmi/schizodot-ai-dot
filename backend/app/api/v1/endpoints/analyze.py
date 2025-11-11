@@ -77,7 +77,7 @@ async def create_analysis_job(request: JobCreate):
         celery_app.send_task(
             "worker.tasks.analyze_media",
             args=[job["job_id"], patient_id, s3_key],
-            countdown=30  # Wait 30 seconds for upload to complete
+            countdown=60  # Wait 60 seconds for upload to complete
         )
         
         logger.info(f"Enqueued analysis task for job {job['job_id']}")
