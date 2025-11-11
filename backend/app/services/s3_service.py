@@ -1,8 +1,8 @@
 from typing import Dict
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
-from app.core.aws import s3
-from app.core.config import settings
+from core.aws import s3
+from core.config import settings
 
 def build_key(patient_id: str, filename: str) -> str:
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")

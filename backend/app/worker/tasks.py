@@ -11,9 +11,9 @@ from datetime import datetime, timezone
 
 import requests
 from celery import Task
-from app.worker import celery_app
-from app.core.aws import s3, dynamodb
-from app.core.config import settings
+from worker import celery_app
+from core.aws import s3, dynamodb
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 

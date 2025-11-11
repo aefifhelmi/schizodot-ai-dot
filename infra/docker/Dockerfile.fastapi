@@ -17,9 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements file
 COPY backend/app/requirements.txt .
 
-# Install Python dependencies to a local directory
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --user -r requirements.txt
+# Create virtual environment and install Python dependencies
+RUN python -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 # ============================================
 # STAGE 2: Runtime
@@ -36,7 +37,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PATH=/root/.local/bin:$PATH
+    PATH=/opt/venv/bin:$PATH \
+    PYTHONPATH=/app
 
 # Install runtime system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -53,7 +55,7 @@ RUN useradd -m -u 1000 appuser && \
 WORKDIR /app
 
 # Copy Python dependencies from builder
-COPY --from=builder --chown=appuser:appuser /root/.local /root/.local
+COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 
 # Copy application code
 COPY --chown=appuser:appuser backend/app /app
@@ -69,10 +71,10 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+    CMD curl -f http://localhost:8000/api/v1/health/ || exit 1
 
 # Default command: Run with Gunicorn + Uvicorn workers
-CMD ["gunicorn", "app.main:app", \
+CMD ["gunicorn", "main:app", \
      "--workers", "4", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \
      "--bind", "0.0.0.0:8000", \

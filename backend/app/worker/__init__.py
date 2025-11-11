@@ -4,14 +4,14 @@ Celery worker configuration for SchizoDot AI
 Handles background task processing for AI analysis
 """
 from celery import Celery
-from app.core.config import settings
+from core.config import settings
 
 # Create Celery app
 celery_app = Celery(
     "schizodot",
     broker=f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/0",
     backend=f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/1",
-    include=["app.worker.tasks"]
+    include=["worker.tasks"]
 )
 
 # Celery configuration

@@ -2,8 +2,8 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional
-from app.services.presign_service import create_presigned_put_url, object_key
-from app.services.log_service import write_upload_log
+from services.presign_service import create_presigned_put_url, object_key
+from services.log_service import write_upload_log
 
 router = APIRouter()
 

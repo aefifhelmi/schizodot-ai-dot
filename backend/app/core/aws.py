@@ -1,7 +1,7 @@
 # app/core/aws.py
 import boto3
 from botocore.config import Config
-from app.core.config import settings
+from core.config import settings
 
 # Reuse one shared session
 _session = boto3.session.Session(

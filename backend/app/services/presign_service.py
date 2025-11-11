@@ -1,8 +1,8 @@
 # app/services/presign_service.py
 from datetime import datetime, timezone, timedelta
 from urllib.parse import quote
-from app.core.aws import s3
-from app.core.config import settings
+from core.aws import s3
+from core.config import settings
 
 def object_key(patient_id: str, filename: str) -> str:
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")

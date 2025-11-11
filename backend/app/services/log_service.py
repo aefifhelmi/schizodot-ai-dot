@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
-from app.core.aws import dynamodb
-from app.core.config import settings
+from core.aws import dynamodb
+from core.config import settings
 
 _table = None
 

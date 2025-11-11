@@ -1,6 +1,6 @@
 import boto3
 from datetime import datetime
-from app.core.config import settings
+from core.config import settings
 from botocore.exceptions import ClientError
 
 def dynamo_resource():

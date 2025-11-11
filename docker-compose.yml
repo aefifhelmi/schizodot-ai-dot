@@ -120,7 +120,7 @@ services:
     networks:
       - schizodot-network
     restart: unless-stopped
-    command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=2
+    command: celery -A worker.celery_app worker --loglevel=info --concurrency=2
 
   # ============================================
   # 4. AI PIPELINE - Emotion & Object Detection
