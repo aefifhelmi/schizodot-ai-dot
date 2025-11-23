@@ -147,14 +147,14 @@ See [LICENSE](LICENSE) file for details.
 **Universiti Teknologi MARA (UiTM)**
 
 ### Development Team
-- **Tengku Afif Helmi Bin Tengku Shahrulizam** - Lead Developer
-- **Muhammad Zahin Bin Mohd Zulflida** - Developer
-- **Ishaza Arianna Binti Ismadee Asmara** - Developer
+- **Tengku Afif Helmi Bin Tengku Shahrulizam** 
+- **Muhammad Zahin Bin Mohd Zulflida** 
+- **Ishaza Arianna Binti Ismadee Asmara** 
 
 ### Medical Advisory Team
-- **Nur Liyana Binti Zuraimi** - Medical Student
-- **Mumtazah Aiesyah Binti Hassan** - Medical Student
-- **Muhammad Ammer Haziq Bin Johari** - Medical Student
+- **Nur Liyana Binti Zuraimi** 
+- **Mumtazah Aiesyah Binti Hassan** 
+- **Muhammad Ammer Haziq Bin Johari** 
 
 ---
 
