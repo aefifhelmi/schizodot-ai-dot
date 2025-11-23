@@ -5,6 +5,7 @@ Repository for analysis results in DynamoDB
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from botocore.exceptions import ClientError
+from boto3.dynamodb.conditions import Key, Attr
 
 from core.aws import dynamodb
 from core.config import settings
@@ -84,8 +85,7 @@ class ResultsRepository:
         """
         try:
             query_kwargs = {
-                "KeyConditionExpression": "user_id = :user_id",
-                "ExpressionAttributeValues": {":user_id": patient_id},
+                "KeyConditionExpression": Key('user_id').eq(patient_id),
                 "Limit": limit,
                 "ScanIndexForward": False  # Most recent first (descending timestamp)
             }
@@ -114,16 +114,30 @@ class ResultsRepository:
             Result item or None
         """
         try:
-            # This requires a GSI on job_id or a scan
-            # For now, using scan (not efficient for production)
+            # DynamoDB scans with FilterExpression can have consistency issues
+            # So we scan recent items and filter in Python for reliability
             response = self.table.scan(
-                FilterExpression="job_id = :job_id",
-                ExpressionAttributeValues={":job_id": job_id},
-                Limit=1
+                Limit=100  # Scan recent items
             )
             
+            # Filter in Python for better consistency
             items = response.get("Items", [])
-            return items[0] if items else None
+            for item in items:
+                if item.get("job_id") == job_id:
+                    return item
+            
+            # If not found in first batch, continue scanning
+            while 'LastEvaluatedKey' in response and len(items) < 500:
+                response = self.table.scan(
+                    Limit=100,
+                    ExclusiveStartKey=response['LastEvaluatedKey']
+                )
+                items = response.get("Items", [])
+                for item in items:
+                    if item.get("job_id") == job_id:
+                        return item
+            
+            return None
         except ClientError as e:
             raise Exception(f"Failed to get result by job: {e.response['Error']['Message']}")
     
@@ -139,8 +153,7 @@ class ResultsRepository:
         """
         try:
             response = self.table.query(
-                KeyConditionExpression="user_id = :user_id",
-                ExpressionAttributeValues={":user_id": patient_id},
+                KeyConditionExpression=Key('user_id').eq(patient_id),
                 Select="COUNT"
             )
             return response.get("Count", 0)

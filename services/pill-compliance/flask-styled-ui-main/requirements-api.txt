@@ -1,0 +1,16 @@
+# API Service Requirements
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Real-time service requirements
+flask==3.0.0
+flask-cors==4.0.0
+flask-socketio==5.3.4
+python-socketio==5.9.0
+
+# Detection Requirements - use latest compatible versions
+opencv-python==4.8.1.78
+numpy==1.24.3
+ultralytics>=8.2.0  # Need C3k2 module support
+mediapipe==0.10.5

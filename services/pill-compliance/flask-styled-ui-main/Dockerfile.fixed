@@ -1,0 +1,101 @@
+# ============================================
+# FIXED Production Dockerfile - Pill Detection API
+# ============================================
+# Resolves all version conflicts and compatibility issues
+# Build tested: 2025-11-19
+# Python 3.11 + PyTorch 2.8.0 (CPU) + YOLOv11
+
+FROM python:3.11-slim AS base
+
+# Metadata
+LABEL maintainer="your-email@example.com"
+LABEL service="pill-detection-api"
+LABEL version="1.0.0-fixed"
+LABEL description="Pill compliance detection with YOLOv11 + MediaPipe"
+
+WORKDIR /app
+
+# ============================================
+# Install System Dependencies
+# ============================================
+# Critical libraries for OpenCV, MediaPipe, and PyTorch
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # OpenCV dependencies
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libgomp1 \
+    libgl1 \
+    # Video processing
+    ffmpeg \
+    libavcodec-extra \
+    # Utilities
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# ============================================
+# Build Stage: Install Python Dependencies
+# ============================================
+FROM base AS builder
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install PyTorch CPU-only FIRST (separate from requirements.txt)
+# This avoids pip syntax errors and ensures correct CPU wheel
+RUN pip install --no-cache-dir torch==2.8.0 \
+    --index-url https://download.pytorch.org/whl/cpu
+
+# Copy and install other requirements
+COPY requirements-fixed.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --prefix=/install \
+    -r /tmp/requirements.txt
+
+# ============================================
+# Runtime Stage: Minimal Production Image
+# ============================================
+FROM base AS runtime
+
+# Copy installed packages from builder
+COPY --from=builder /install /usr/local
+
+# Copy PyTorch CPU from builder (installed separately)
+COPY --from=builder /usr/local/lib/python3.11/site-packages/torch* /usr/local/lib/python3.11/site-packages/
+
+# Create non-root user for security
+RUN useradd -m -u 1000 -s /bin/bash appuser && \
+    mkdir -p /app/models /app/tmp && \
+    chown -R appuser:appuser /app
+
+# Copy application code
+COPY --chown=appuser:appuser simple_detector.py /app/
+COPY --chown=appuser:appuser api_service.py /app/
+COPY --chown=appuser:appuser models/ /app/models/
+
+# Validate model file exists
+RUN test -f /app/models/best.pt || \
+    (echo "ERROR: Model file /app/models/best.pt not found!" && exit 1)
+
+# Switch to non-root user
+USER appuser
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    MODEL_PATH=/app/models/best.pt \
+    DEVICE=cpu \
+    TORCH_LOAD_WEIGHTS_ONLY=0 \
+    PORT=8003 \
+    PYTHONPATH=/app
+
+# Expose API port
+EXPOSE 8003
+
+# Health check (increased start_period for model loading)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8003/health').read()" || exit 1
+
+# Run FastAPI with Uvicorn
+CMD ["python", "-m", "uvicorn", "api_service:app", "--host", "0.0.0.0", "--port", "8003", "--workers", "1", "--log-level", "info"]

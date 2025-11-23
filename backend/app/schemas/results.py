@@ -17,7 +17,7 @@ class AudioEmotionResult(BaseModel):
     """Audio-based emotion analysis"""
     primary_emotion: str
     confidence: float = Field(..., ge=0.0, le=1.0)
-    all_emotions: List[EmotionScore] = Field(default_factory=list)
+    all_emotions: Optional[Dict[str, float]] = Field(None, description="All emotion scores as dict")
     audio_quality: Optional[str] = Field(None, description="Audio quality assessment")
 
 
@@ -25,28 +25,32 @@ class FacialEmotionResult(BaseModel):
     """Face-based emotion analysis"""
     primary_emotion: str
     confidence: float = Field(..., ge=0.0, le=1.0)
-    all_emotions: List[EmotionScore] = Field(default_factory=list)
-    face_detected: bool = Field(default=True)
+    all_emotions: Optional[Dict[str, float]] = Field(None, description="All emotion scores as dict")
+    face_detected: Optional[bool] = Field(True)
     frame_count: Optional[int] = Field(None, description="Number of frames analyzed")
 
 
 class ComplianceResult(BaseModel):
     """Medication compliance detection"""
-    pill_detected: bool
-    hand_detected: bool
-    face_detected: bool
-    compliance_score: float = Field(..., ge=0.0, le=1.0, description="Overall compliance score")
-    confidence: float = Field(..., ge=0.0, le=1.0)
-    verification_status: str = Field(..., description="compliant, non-compliant, uncertain")
+    pill_detected: Optional[bool] = None
+    hand_detected: Optional[bool] = None
+    face_detected: Optional[bool] = None
+    compliance_score: Optional[float] = Field(None, ge=0.0, le=1.0, description="Overall compliance score")
+    confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    verification_status: Optional[str] = Field(None, description="compliant, non-compliant, uncertain")
+    status: Optional[str] = None
+    note: Optional[str] = None
 
 
 class MultimodalFusion(BaseModel):
     """Combined analysis from multiple modalities"""
-    emotional_consistency: str = Field(..., description="Consistency between audio and facial emotions")
-    overall_emotion: str = Field(..., description="Fused emotion assessment")
-    confidence: float = Field(..., ge=0.0, le=1.0)
-    risk_level: str = Field(..., description="low, medium, high")
-    risk_factors: List[str] = Field(default_factory=list)
+    primary_emotion: Optional[str] = None
+    confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    all_emotions: Optional[Dict[str, float]] = Field(None, description="All emotion scores as dict")
+    emotional_consistency: Optional[str] = Field(None, description="Consistency between audio and facial emotions")
+    overall_emotion: Optional[str] = Field(None, description="Fused emotion assessment")
+    risk_level: Optional[str] = Field(None, description="low, medium, high")
+    risk_factors: Optional[List[str]] = Field(default_factory=list)
 
 
 class ClinicalSummary(BaseModel):

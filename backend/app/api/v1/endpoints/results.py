@@ -68,16 +68,17 @@ async def get_patient_results(
         analysis_results = []
         for item in items:
             results_data = item.get("results", {})
+            emotion_analysis = results_data.get("emotion_analysis", {})
             
             analysis_results.append(AnalysisResult(
                 job_id=item.get("job_id"),
                 patient_id=item.get("user_id"),
                 s3_key=item.get("s3_key"),
                 analyzed_at=item.get("analyzed_at"),
-                audio_emotion=results_data.get("audio_emotion"),
-                facial_emotion=results_data.get("facial_emotion"),
-                compliance=results_data.get("compliance"),
-                multimodal_fusion=results_data.get("multimodal_fusion"),
+                audio_emotion=emotion_analysis.get("audio_emotion"),
+                facial_emotion=emotion_analysis.get("facial_emotion"),
+                compliance=results_data.get("object_detection"),
+                multimodal_fusion=emotion_analysis.get("multimodal_fusion"),
                 clinical_summary=results_data.get("clinical_summary"),
                 processing_time_seconds=item.get("processing_time_seconds")
             ))
@@ -127,15 +128,18 @@ async def get_result_by_job(job_id: str):
         
         results_data = item.get("results", {})
         
+        # Extract emotion data from nested emotion_analysis structure
+        emotion_analysis = results_data.get("emotion_analysis", {})
+        
         return AnalysisResult(
             job_id=item.get("job_id"),
             patient_id=item.get("user_id"),
             s3_key=item.get("s3_key"),
             analyzed_at=item.get("analyzed_at"),
-            audio_emotion=results_data.get("audio_emotion"),
-            facial_emotion=results_data.get("facial_emotion"),
-            compliance=results_data.get("compliance"),
-            multimodal_fusion=results_data.get("multimodal_fusion"),
+            audio_emotion=emotion_analysis.get("audio_emotion"),
+            facial_emotion=emotion_analysis.get("facial_emotion"),
+            compliance=results_data.get("object_detection"),  # compliance data is in object_detection
+            multimodal_fusion=emotion_analysis.get("multimodal_fusion"),
             clinical_summary=results_data.get("clinical_summary"),
             processing_time_seconds=item.get("processing_time_seconds")
         )

@@ -1,0 +1,28 @@
+# ============================================
+# FIXED Requirements - Pill Detection API
+# ============================================
+# All versions pinned to match working environment
+# Tested on: macOS, Python 3.11
+# Date: 2025-11-19
+
+# NOTE: torch is installed separately in Dockerfile
+# torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+
+# Object Detection
+ultralytics==8.3.228
+
+# Computer Vision
+opencv-contrib-python==4.12.0.88
+mediapipe==0.10.18
+
+# API Framework
+fastapi==0.115.12
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Core Libraries
+numpy>=2.0.0,<3.0.0
+pillow==11.0.0
+
+# Logging (optional but recommended)
+python-json-logger==3.2.1

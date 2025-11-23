@@ -9,14 +9,69 @@ import logging
 from typing import Dict, Any
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 
 import requests
 from celery import Task
 from worker import celery_app
 from core.aws import s3, dynamodb
 from core.config import settings
+import sys
+sys.path.insert(0, '/app')
+
+# Import Bedrock and Transcription services
+try:
+    from services.bedrock import BedrockClient
+    BEDROCK_AVAILABLE = True
+except ImportError as e:
+    logger_import = logging.getLogger(__name__)
+    logger_import.warning(f"Bedrock service not available: {e}")
+    BEDROCK_AVAILABLE = False
+
+try:
+    from services.transcription import (
+        TranscribeClient,
+        extract_audio_from_video,
+        format_transcript_for_llm
+    )
+    TRANSCRIPTION_AVAILABLE = True
+except ImportError as e:
+    logger_import = logging.getLogger(__name__)
+    logger_import.warning(f"Transcription service not available: {e}")
+    TRANSCRIPTION_AVAILABLE = False
+    TranscribeClient = None
+    extract_audio_from_video = None
+    format_transcript_for_llm = None
 
 logger = logging.getLogger(__name__)
+
+
+def convert_floats_to_decimal(obj):
+    """
+    Recursively convert all float values to Decimal for DynamoDB compatibility
+    """
+    if isinstance(obj, list):
+        return [convert_floats_to_decimal(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: convert_floats_to_decimal(value) for key, value in obj.items()}
+    elif isinstance(obj, float):
+        return Decimal(str(obj))
+    else:
+        return obj
+
+
+def convert_decimals_to_float(obj):
+    """
+    Recursively convert all Decimal values to float for JSON serialization
+    """
+    if isinstance(obj, list):
+        return [convert_decimals_to_float(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: convert_decimals_to_float(value) for key, value in obj.items()}
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    else:
+        return obj
 
 
 class CallbackTask(Task):
@@ -56,41 +111,52 @@ def analyze_media(self, job_id: str, patient_id: str, s3_key: str) -> Dict[str, 
         update_job_status(job_id, "processing", progress=20, message="Downloading media file...")
         local_path = download_from_s3(s3_key)
         
-        # Step 3: Run emotion detection (40% progress)
+        # Step 3: Run emotion detection (30% progress)
         logger.info("Running emotion detection...")
-        update_job_status(job_id, "processing", progress=40, message="Analyzing emotions...")
+        update_job_status(job_id, "processing", progress=30, message="Analyzing emotions...")
         emotion_result = call_emotion_service(local_path)
         
-        # Step 4: Run object detection (60% progress)
+        # Step 4: Transcribe audio (50% progress)
+        logger.info("Transcribing audio...")
+        update_job_status(job_id, "processing", progress=50, message="Transcribing speech...")
+        transcript_result = transcribe_audio(local_path)
+        
+        # Step 5: Run object detection (65% progress)
         logger.info("Running object detection...")
-        update_job_status(job_id, "processing", progress=60, message="Detecting medication compliance...")
+        update_job_status(job_id, "processing", progress=65, message="Detecting medication compliance...")
         object_result = call_object_detection_service(local_path)
         
-        # Step 5: Multimodal fusion (75% progress)
+        # Step 6: Multimodal fusion (75% progress)
         logger.info("Performing multimodal fusion...")
         update_job_status(job_id, "processing", progress=75, message="Combining analysis results...")
         fusion_result = multimodal_fusion(emotion_result, object_result)
         
-        # Step 6: LLM analysis (85% progress)
+        # Step 7: LLM analysis (85% progress)
         update_job_status(job_id, "processing", progress=85, message="Generating clinical summary...")
-        if settings.BEDROCK_ENABLE:
+        if settings.ENABLE_BEDROCK_SERVICE:
             logger.info("Generating clinical summary with Bedrock...")
-            clinical_summary = bedrock_analysis(fusion_result)
+            transcript_text = transcript_result.get('transcript') if transcript_result else None
+            clinical_summary = bedrock_analysis(fusion_result, patient_id, transcript_text)
         else:
             logger.info("Bedrock disabled, using rule-based summary")
             clinical_summary = rule_based_summary(fusion_result)
+        
+        # Ensure clinical summary has timestamp
+        if 'timestamp' not in clinical_summary:
+            clinical_summary['timestamp'] = datetime.now(timezone.utc).isoformat()
         
         # Calculate processing time
         end_time = datetime.now(timezone.utc)
         processing_time = (end_time - start_time).total_seconds()
         
-        # Step 7: Store results in DynamoDB (95% progress)
+        # Step 8: Store results in DynamoDB (95% progress)
         update_job_status(job_id, "processing", progress=95, message="Saving results...")
         results = {
             "job_id": job_id,
             "patient_id": patient_id,
             "s3_key": s3_key,
             "emotion_analysis": emotion_result,
+            "transcript": transcript_result,
             "object_detection": object_result,
             "fusion_result": fusion_result,
             "clinical_summary": clinical_summary,
@@ -139,7 +205,7 @@ def download_from_s3(s3_key: str) -> str:
     from botocore.exceptions import ClientError
     
     max_retries = 5
-    retry_delay = 2  # seconds
+    retry_delay = 1  # seconds
     
     for attempt in range(max_retries):
         try:
@@ -188,7 +254,10 @@ def download_from_s3(s3_key: str) -> str:
 
 
 def call_emotion_service(file_path: str) -> Dict[str, Any]:
-    """Call AI pipeline emotion detection service"""
+    """
+    Call real emotion detection service (multimodal: audio + visual)
+    Returns emotion analysis with audio, face, and multimodal fusion results
+    """
     
     # Check if service is enabled
     if not settings.ENABLE_EMOTION_SERVICE:
@@ -196,31 +265,90 @@ def call_emotion_service(file_path: str) -> Dict[str, Any]:
         return get_emotion_stub_data()
     
     try:
-        ai_url = settings.AI_PIPELINE_URL
+        emotion_url = settings.EMOTION_SERVICE_URL
+        endpoint = f"{emotion_url}/v1/emotion/predict"
         
+        logger.info(f"Calling emotion service at {endpoint}")
+        
+        # Open file and send to emotion service
         with open(file_path, "rb") as f:
-            files = {"file": f}
+            files = {"file": (Path(file_path).name, f, "video/mp4")}
             response = requests.post(
-                f"{ai_url}/emotion/analyze",
+                endpoint,
                 files=files,
-                timeout=settings.AI_SERVICE_TIMEOUT
+                timeout=settings.EMOTION_SERVICE_TIMEOUT
             )
         
         if response.status_code == 200:
             result = response.json()
-            result["status"] = "real"
-            return result
+            
+            # Transform emotion service response to expected format
+            audio = result.get("audio", {})
+            face = result.get("face", {})
+            # Emotion service returns "fused" not "multimodal"
+            multimodal = result.get("fused", result.get("multimodal", {}))
+            model_type = result.get("model_type", "unknown")
+            
+            # Calculate confidence from probs if not provided
+            audio_probs = audio.get("probs", {})
+            audio_label = audio.get("label", "unknown")
+            audio_confidence = audio_probs.get(audio_label, 0.0) if audio_label in audio_probs else 0.0
+            
+            face_probs = face.get("probs", {})
+            face_label = face.get("label", "unknown")
+            face_confidence = face_probs.get(face_label, 0.0) if face_label in face_probs else 0.0
+            
+            multimodal_probs = multimodal.get("probs", {})
+            multimodal_label = multimodal.get("label", "unknown")
+            multimodal_confidence = multimodal_probs.get(multimodal_label, 0.0) if multimodal_label in multimodal_probs else 0.0
+            
+            # Convert to DynamoDB-compatible format with Decimal
+            transformed = {
+                "status": "success",
+                "model_type": model_type,
+                "audio_emotion": {
+                    "primary_emotion": audio_label,
+                    "confidence": Decimal(str(audio_confidence)),
+                    "all_emotions": {
+                        k: Decimal(str(v)) 
+                        for k, v in audio_probs.items()
+                    }
+                },
+                "facial_emotion": {
+                    "primary_emotion": face_label,
+                    "confidence": Decimal(str(face_confidence)),
+                    "all_emotions": {
+                        k: Decimal(str(v)) 
+                        for k, v in face_probs.items()
+                    },
+                    "face_detected": True
+                },
+                "multimodal_fusion": {
+                    "primary_emotion": multimodal_label,
+                    "confidence": Decimal(str(multimodal_confidence)),
+                    "all_emotions": {
+                        k: Decimal(str(v)) 
+                        for k, v in multimodal_probs.items()
+                    }
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            
+            logger.info(f"Emotion detected: {multimodal_label} (confidence: {multimodal_confidence:.2%}, model: {model_type})")
+            return transformed
         else:
-            logger.warning(f"Emotion service returned {response.status_code}")
+            logger.warning(f"Emotion service returned {response.status_code}: {response.text}")
             return get_emotion_stub_data(error=f"Service returned {response.status_code}")
             
     except Exception as e:
         logger.error(f"Failed to call emotion service: {e}")
+        import traceback
+        traceback.print_exc()
         return get_emotion_stub_data(error=str(e))
 
 
 def call_object_detection_service(file_path: str) -> Dict[str, Any]:
-    """Call AI pipeline object detection service"""
+    """Call pill detection service (YOLOv11 + MediaPipe)"""
     
     # Check if service is enabled
     if not settings.ENABLE_COMPLIANCE_SERVICE:
@@ -228,26 +356,36 @@ def call_object_detection_service(file_path: str) -> Dict[str, Any]:
         return get_compliance_stub_data()
     
     try:
-        ai_url = settings.AI_PIPELINE_URL
+        detection_url = settings.OBJECT_DETECTION_SERVICE_URL
+        endpoint = f"{detection_url}/v1/detect"
+        
+        logger.info(f"Calling pill detection service at {endpoint}")
         
         with open(file_path, "rb") as f:
-            files = {"file": f}
+            files = {"video": (Path(file_path).name, f, "video/mp4")}
             response = requests.post(
-                f"{ai_url}/object-detection/analyze",
+                endpoint,
                 files=files,
-                timeout=settings.AI_SERVICE_TIMEOUT
+                timeout=settings.OBJECT_DETECTION_TIMEOUT
             )
         
         if response.status_code == 200:
             result = response.json()
-            result["status"] = "real"
+            
+            # Add timestamp if not present
+            if 'timestamp' not in result:
+                result['timestamp'] = datetime.now(timezone.utc).isoformat()
+            
+            logger.info(f"Pill detection complete: {result.get('verification_status')} "
+                       f"(score: {result.get('compliance_score', 0):.2f})")
+            
             return result
         else:
-            logger.warning(f"Object detection service returned {response.status_code}")
+            logger.warning(f"Pill detection service returned {response.status_code}: {response.text[:200]}")
             return get_compliance_stub_data(error=f"Service returned {response.status_code}")
             
     except Exception as e:
-        logger.error(f"Failed to call object detection service: {e}")
+        logger.error(f"Failed to call pill detection service: {e}")
         return get_compliance_stub_data(error=str(e))
 
 
@@ -283,11 +421,105 @@ def assess_risk(emotion_result: Dict, object_result: Dict) -> str:
     return "low"
 
 
-def bedrock_analysis(fusion_result: Dict) -> Dict[str, Any]:
-    """Generate clinical summary using AWS Bedrock"""
-    # TODO: Implement Bedrock integration
-    logger.info("Bedrock analysis called (not yet implemented)")
-    return rule_based_summary(fusion_result)
+def transcribe_audio(file_path: str) -> Dict[str, Any]:
+    """Transcribe audio using AWS Transcribe"""
+    if not settings.ENABLE_TRANSCRIPTION:
+        logger.info("Transcription disabled, skipping")
+        return get_transcription_stub_data()
+    
+    if not TRANSCRIPTION_AVAILABLE:
+        logger.warning("Transcription service not available, using stub data")
+        return get_transcription_stub_data(error="Transcription service not imported")
+    
+    try:
+        # Extract audio from video
+        logger.info(f"Extracting audio from {file_path}")
+        audio_path = extract_audio_from_video(file_path)
+        
+        # Initialize Transcribe client
+        client = TranscribeClient(
+            region=os.getenv('AWS_TRANSCRIBE_REGION', 'us-east-1'),
+            s3_bucket=os.getenv('S3_BUCKET'),
+            language_code=os.getenv('TRANSCRIBE_LANGUAGE_CODE', 'ms-MY'),
+            max_speakers=int(os.getenv('TRANSCRIBE_MAX_SPEAKERS', 2))
+        )
+        
+        # Transcribe (async, waits for completion)
+        logger.info("Starting transcription job...")
+        result = client.transcribe_audio(
+            audio_path=audio_path,
+            wait_for_completion=True,
+            max_wait_seconds=300
+        )
+        
+        # Cleanup audio file
+        try:
+            Path(audio_path).unlink()
+            logger.info("Temporary audio file deleted")
+        except Exception as e:
+            logger.warning(f"Failed to delete audio file: {e}")
+        
+        logger.info(f"Transcription complete: {result.get('word_count', 0)} words")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Transcription failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return get_transcription_stub_data(error=str(e))
+
+
+def bedrock_analysis(fusion_result: Dict, patient_id: str, transcript: str = None) -> Dict[str, Any]:
+    """Generate clinical summary using AWS Bedrock with transcript"""
+    
+    if not BEDROCK_AVAILABLE:
+        logger.warning("Bedrock service not available, using rule-based fallback")
+        return get_rule_based_summary(fusion_result)
+    
+    try:
+        # Prepare emotion data for Bedrock
+        patient_state = fusion_result.get("patient_state", {})
+        compliance = fusion_result.get("medication_compliance", {})
+        
+        emotion_data = {
+            "audio_emotion": patient_state.get("audio_emotion", {}),
+            "facial_emotion": patient_state.get("facial_emotion", {}),
+            "compliance": compliance
+        }
+        
+        # Convert Decimals to floats for JSON serialization
+        emotion_data = convert_decimals_to_float(emotion_data)
+        
+        # Initialize Bedrock client
+        bedrock = BedrockClient(
+            region=os.getenv('AWS_BEDROCK_REGION', 'us-east-1'),
+            model_id=os.getenv('AWS_BEDROCK_MODEL_ID', 'anthropic.claude-3-haiku-20240307-v1:0'),
+            max_tokens=int(os.getenv('BEDROCK_MAX_TOKENS', 1500)),
+            temperature=float(os.getenv('BEDROCK_TEMPERATURE', 0.7))
+        )
+        
+        # Generate clinical summary with transcript
+        logger.info(f"Generating clinical summary for {patient_id} with Bedrock")
+        if transcript:
+            logger.info(f"Including transcript ({len(transcript)} chars)")
+        
+        clinical_summary = bedrock.generate_clinical_summary(
+            emotion_data=emotion_data,
+            patient_id=patient_id,
+            transcript=transcript
+        )
+        
+        logger.info("Clinical summary generated successfully")
+        return clinical_summary
+        
+    except Exception as e:
+        logger.error(f"Bedrock analysis failed: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Fallback to rule-based summary
+        logger.info("Falling back to rule-based summary")
+        return rule_based_summary(fusion_result)
 
 
 def rule_based_summary(fusion_result: Dict) -> Dict[str, Any]:
@@ -353,6 +585,9 @@ def update_job_status(job_id: str, status: str, **kwargs):
             update_expr += ", completed_at = :completed_at"
             expr_values[":completed_at"] = datetime.now(timezone.utc).isoformat()
         
+        # Convert all floats to Decimal for DynamoDB compatibility
+        expr_values = convert_floats_to_decimal(expr_values)
+        
         table.update_item(
             Key={"job_id": job_id},
             UpdateExpression=update_expr,
@@ -384,6 +619,9 @@ def store_results(job_id: str, results: Dict[str, Any]):
             "processing_time_seconds": results.get("processing_time_seconds"),
             "status": "completed"
         }
+        
+        # Convert all floats to Decimal for DynamoDB compatibility
+        item = convert_floats_to_decimal(item)
         
         table.put_item(Item=item)
         logger.info(f"Stored results for job {job_id}")
@@ -475,5 +713,31 @@ def get_compliance_stub_data(error: str = None) -> Dict[str, Any]:
         stub["note"] = "Stub data returned due to service error"
     else:
         stub["note"] = "Stub data - compliance service disabled"
+    
+    return stub
+
+
+def get_transcription_stub_data(error: str = None) -> Dict[str, Any]:
+    """
+    Return stub data for transcription service
+    Used when ENABLE_TRANSCRIPTION is False or service fails
+    """
+    stub = {
+        "status": "stub",
+        "job_name": "stub-transcription",
+        "transcript": "Stub transcript - transcription service disabled or failed",
+        "segments": [],
+        "language_code": "ms-MY",
+        "word_count": 0,
+        "speaker_count": 0,
+        "duration_seconds": 0.0,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+    
+    if error:
+        stub["error"] = error
+        stub["note"] = "Stub data returned due to transcription error"
+    else:
+        stub["note"] = "Stub data - transcription service disabled"
     
     return stub

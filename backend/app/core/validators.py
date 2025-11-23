@@ -10,6 +10,7 @@ from core.exceptions import validation_error_exception
 # Allowed MIME types
 ALLOWED_VIDEO_TYPES = [
     "video/mp4",
+    "video/webm",  # WebM format for browser recording
     "video/quicktime",
     "video/x-msvideo",
     "video/mpeg",

@@ -191,6 +191,28 @@ class JobsRepository:
             }
         except ClientError as e:
             raise Exception(f"Failed to list jobs: {e.response['Error']['Message']}")
+    
+    def list_all_jobs(self, limit: int = 100) -> Dict[str, Any]:
+        """
+        List all jobs in the system (scan operation)
+        
+        Args:
+            limit: Maximum number of jobs to return
+            
+        Returns:
+            Dictionary with items and pagination token
+        """
+        try:
+            response = self.table.scan(
+                Limit=limit
+            )
+            
+            return {
+                "items": response.get("Items", []),
+                "next_token": response.get("LastEvaluatedKey")
+            }
+        except ClientError as e:
+            raise Exception(f"Failed to list all jobs: {e.response['Error']['Message']}")
 
 
 # Singleton instance

@@ -2,9 +2,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# If you moved settings and router as we planned:
-from core.config import settings
-from api.v1.router import api_router    
+# Import from app package
+from app.core.config import settings
+from app.api.v1.router import api_router    
 
 # Create the ASGI app object named exactly `app`
 app = FastAPI(title=getattr(settings, "APP_NAME", "SchizoDot Backend"))

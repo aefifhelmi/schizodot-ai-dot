@@ -1,0 +1,28 @@
+# ============================================
+# Production Requirements - Pill Detection API
+# ============================================
+# Pinned versions for reproducible builds
+# CPU-only for lightweight deployment
+
+# Core ML frameworks
+torch==2.1.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+torchvision==0.16.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+
+# Computer Vision
+opencv-contrib-python==4.9.0.80
+mediapipe==0.10.9
+
+# Object Detection
+ultralytics==8.1.20
+
+# API Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Utilities
+numpy==1.24.3
+pillow==10.2.0
+
+# Logging
+python-json-logger==2.0.7

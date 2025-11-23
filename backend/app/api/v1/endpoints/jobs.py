@@ -16,6 +16,54 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get("/", response_model=list, summary="List all jobs")
+async def list_all_jobs(
+    limit: int = Query(default=100, ge=1, le=500, description="Maximum number of results")
+):
+    """
+    List all jobs in the system (for clinician dashboard)
+    
+    Returns all jobs across all patients in reverse chronological order.
+    Use this endpoint to populate the clinician dashboard with all patient sessions.
+    """
+    try:
+        limit = validate_pagination_limit(limit, max_limit=500)
+        
+        result = jobs_repo.list_all_jobs(limit=limit)
+        jobs = result.get("items", [])
+        
+        # Convert to JobDetail models
+        job_details = []
+        for job in jobs:
+            try:
+                job_details.append(JobDetail(
+                    job_id=job["job_id"],
+                    patient_id=job.get("patient_id") or job.get("user_id"),
+                    status=JobStatus(job["status"]),
+                    s3_key=job["s3_key"],
+                    filename=job.get("filename", ""),
+                    content_type=job.get("content_type", ""),
+                    created_at=job["created_at"],
+                    updated_at=job.get("updated_at"),
+                    started_at=job.get("started_at"),
+                    completed_at=job.get("completed_at"),
+                    error=job.get("error"),
+                    results=job.get("results")
+                ))
+            except Exception as e:
+                logger.warning(f"Skipping malformed job {job.get('job_id')}: {e}")
+                continue
+        
+        # Sort by created_at descending (most recent first)
+        job_details.sort(key=lambda x: x.created_at, reverse=True)
+        
+        return job_details
+        
+    except Exception as e:
+        logger.error(f"Failed to list all jobs: {str(e)}", exc_info=True)
+        raise internal_server_error_exception("retrieve all jobs", str(e))
+
+
 @router.get("/{job_id}/status", response_model=JobStatusResponse, summary="Get job status")
 async def get_job_status(job_id: str):
     """

@@ -1,0 +1,7 @@
+opencv-contrib-python==4.6.0.66
+mediapipe==0.10.18
+ultralytics
+Flask==2.3.2
+Flask-CORS==4.0.0
+numpy
+torch
