@@ -1,0 +1,297 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # 1. REDIS - Message Queue for Celery
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: schizodot-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - schizodot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ============================================
+  # 2. FASTAPI BACKEND - Main API Server
+  # ============================================
+  fastapi-backend:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.fastapi
+    container_name: schizodot-fastapi
+    ports:
+      - "8000:8000"
+    environment:
+      # Python Path
+      - PYTHONPATH=/
+      # Application
+      - APP_NAME=${APP_NAME:-SchizoDot Backend}
+      - ENV=${ENV:-development}
+      
+      # AWS Configuration
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET=${S3_BUCKET:-schizodot-backend-storage}
+      - DYNAMO_TABLE=${DYNAMO_TABLE:-SchizodotUsers}
+      - DYNAMO_TABLE_JOBS=${DYNAMO_TABLE_JOBS:-SchizodotJobs}
+      
+      # Bedrock
+      - BEDROCK_REGION=${BEDROCK_REGION:-us-east-1}
+      - BEDROCK_ENABLE=${BEDROCK_ENABLE:-false}
+      - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID:-anthropic.claude-v2}
+      
+      # Redis/Celery
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      
+      # API Configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      
+      # Internal Service URLs
+      - AI_PIPELINE_URL=http://ai-pipeline:8001
+      - EMOTION_SERVICE_URL=${EMOTION_SERVICE_URL:-http://emotion-service:8000}
+      - OBJECT_DETECTION_SERVICE_URL=${OBJECT_DETECTION_SERVICE_URL:-http://pill-detection:8003}
+      
+      # Feature Flags
+      - ENABLE_EMOTION_SERVICE=${ENABLE_EMOTION_SERVICE:-true}
+      - ENABLE_COMPLIANCE_SERVICE=${ENABLE_COMPLIANCE_SERVICE:-true}
+    volumes:
+      - ./backend/app:/app
+      - ./uploads:/uploads
+      - ./logs:/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - schizodot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    command: >
+      gunicorn app.main:app
+      --workers 4
+      --worker-class uvicorn.workers.UvicornWorker
+      --bind 0.0.0.0:8000
+      --timeout 120
+      --access-logfile -
+      --error-logfile -
+      --log-level info
+
+  # ============================================
+  # 3. CELERY WORKER - Background Task Processing
+  # ============================================
+  celery-worker:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: schizodot-worker
+    environment:
+      # Python Path
+      - PYTHONPATH=/
+      # AWS Configuration
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET=${S3_BUCKET:-schizodot-backend-storage}
+      - DYNAMO_TABLE=${DYNAMO_TABLE:-SchizodotUsers}
+      - DYNAMO_TABLE_JOBS=${DYNAMO_TABLE_JOBS:-SchizodotJobs}
+      
+      # Bedrock
+      - BEDROCK_REGION=${BEDROCK_REGION:-us-east-1}
+      - BEDROCK_ENABLE=${BEDROCK_ENABLE:-false}
+      - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID:-anthropic.claude-v2}
+      
+      # Redis/Celery
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      
+      # Internal Service URLs
+      - AI_PIPELINE_URL=http://ai-pipeline:8001
+      - EMOTION_SERVICE_URL=${EMOTION_SERVICE_URL:-http://emotion-service:8000}
+      - OBJECT_DETECTION_SERVICE_URL=${OBJECT_DETECTION_SERVICE_URL:-http://pill-detection:8003}
+      
+      # Feature Flags
+      - ENABLE_EMOTION_SERVICE=${ENABLE_EMOTION_SERVICE:-true}
+      - ENABLE_COMPLIANCE_SERVICE=${ENABLE_COMPLIANCE_SERVICE:-true}
+    volumes:
+      - ./backend/app:/app
+      - ./uploads:/uploads
+      - ./logs:/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      fastapi-backend:
+        condition: service_healthy
+    networks:
+      - schizodot-network
+    restart: unless-stopped
+    command: celery -A worker.celery_app worker --loglevel=info --concurrency=2
+
+  # ============================================
+  # 4. EMOTION SERVICE - Multimodal Emotion Recognition
+  # ============================================
+  emotion-service:
+    build:
+      context: ./services/emotion-detection
+      dockerfile: infra/docker/emotion.Dockerfile
+    image: schizodot-emotion:latest
+    container_name: schizodot-emotion
+    ports:
+      - "8001:8000"
+    environment:
+      # Python environment
+      - PYTHONPATH=/app
+      # Headless operation
+      - MPLBACKEND=Agg
+      - TF_CPP_MIN_LOG_LEVEL=2
+      - OPENCV_VIDEOIO_DEBUG=0
+      - QT_QPA_PLATFORM=offscreen
+      - DISPLAY=
+    volumes:
+      # Mount model weights as read-only
+      - ./services/emotion-detection/ai/emotion/weights:/app/ai/emotion/weights:ro
+      # Mount uploads and logs for persistence
+      - ./uploads:/uploads
+      - ./logs:/logs
+    networks:
+      - schizodot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ============================================
+  # 5. PILL DETECTION SERVICE - Video Analysis (Optional)
+  # ============================================
+  pill-detection:
+    build:
+      context: ./flask-styled-ui-main
+      dockerfile: Dockerfile.pilldetection
+    container_name: schizodot-pill-detection
+    ports:
+      - "8003:8003"
+    environment:
+      - MODEL_PATH=/app/models/best.pt
+      - DEVICE=cpu
+      - TORCH_LOAD_WEIGHTS_ONLY=0
+    volumes:
+      - ./flask-styled-ui-main/models:/app/models:ro
+      - ./uploads:/uploads
+      - ./logs:/logs
+    networks:
+      - schizodot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ============================================
+  # 6. PROTO COMPLIANCE - Live Webcam Protocol (WORKING VERSION)
+  # ============================================
+  proto-compliance:
+    build:
+      context: ./flask-styled-ui-main
+      dockerfile: Dockerfile.proto
+    container_name: schizodot-proto-compliance
+    ports:
+      - "5001:5000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./flask-styled-ui-main/models:/app/models:ro
+      - ./flask-styled-ui-main/patient_report:/app/patient_report
+    networks:
+      - schizodot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/status_update')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================
+  # 5. NGINX - Reverse Proxy
+  # ============================================
+  nginx:
+    image: nginx:alpine
+    container_name: schizodot-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - fastapi-backend
+    networks:
+      - schizodot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # 6. FLOWER - Celery Monitoring (Optional)
+  # ============================================
+  flower:
+    image: mher/flower:2.0
+    container_name: schizodot-flower
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - FLOWER_PORT=5555
+    depends_on:
+      - redis
+      - celery-worker
+    networks:
+      - schizodot-network
+    restart: unless-stopped
+    command: celery --broker=redis://redis:6379/0 flower --port=5555
+
+# ============================================
+# NETWORKS
+# ============================================
+networks:
+  schizodot-network:
+    driver: bridge
+    name: schizodot-network
+
+# ============================================
+# VOLUMES
+# ============================================
+volumes:
+  redis_data:
+    driver: local
+    name: schizodot-redis-data

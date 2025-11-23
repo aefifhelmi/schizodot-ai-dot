@@ -1,0 +1,3 @@
+[submodule "external/emotion-av"]
+	path = external/emotion-av
+	url = https://github.com/katerynaCh/multimodal-emotion-recognition

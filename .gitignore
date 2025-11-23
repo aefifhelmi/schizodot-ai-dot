@@ -205,3 +205,41 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ============================================
+# SchizoDot AI Specific
+# ============================================
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Docker volumes and data
+uploads/
+logs/
+ai_models/cache/
+*.pth
+*.pt
+*.onnx
+*.h5
+
+# AWS credentials (should never be committed)
+.aws/
+credentials
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Model weights (use Git LFS if needed)
+*.bin
+*.safetensors
+
+# Database dumps
+*.db
+*.sqlite
+
+# OS specific
+.DS_Store
+Thumbs.db

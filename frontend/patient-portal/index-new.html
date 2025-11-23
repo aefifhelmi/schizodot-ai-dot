@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOMINO — Patient Care Portal</title>
+    <link rel="stylesheet" href="styles-new.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:wght@400;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-layer"></div>
+    <div class="bg-pattern"></div>
+
+    <!-- Header with staggered reveal -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <svg class="logo-icon" width="48" height="48" viewBox="0 0 48 48">
+                        <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="2.5"/>
+                        <circle cx="24" cy="15" r="5" fill="currentColor"/>
+                        <circle cx="15" cy="26" r="4" fill="currentColor"/>
+                        <circle cx="33" cy="26" r="4" fill="currentColor"/>
+                        <path d="M18 34 Q24 38 30 34" stroke="currentColor" stroke-width="2.5" fill="none"/>
+                    </svg>
+                    <div class="logo-text">
+                        <h1>DOMINO</h1>
+                        <span>Patient Care Portal</span>
+                    </div>
+                </div>
+                <div class="session-info" id="sessionInfo" style="display: none;">
+                    <span class="session-label">Session ID:</span>
+                    <span class="session-id" id="currentSessionId"></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-container">
+        <div class="container">
+            <!-- Progress Steps -->
+            <div class="progress-steps" id="progressSteps">
+                <div class="step-item active" data-step="1">
+                    <div class="step-indicator">
+                        <span class="step-number">1</span>
+                        <span class="step-check">✓</span>
+                    </div>
+                    <span class="step-label">Identification</span>
+                </div>
+                <div class="step-divider"></div>
+                <div class="step-item" data-step="2">
+                    <div class="step-indicator">
+                        <span class="step-number">2</span>
+                        <span class="step-check">✓</span>
+                    </div>
+                    <span class="step-label">Questions</span>
+                </div>
+                <div class="step-divider"></div>
+                <div class="step-item" data-step="3">
+                    <div class="step-indicator">
+                        <span class="step-number">3</span>
+                        <span class="step-check">✓</span>
+                    </div>
+                    <span class="step-label">Recording</span>
+                </div>
+                <div class="step-divider"></div>
+                <div class="step-item" data-step="4">
+                    <div class="step-indicator">
+                        <span class="step-number">4</span>
+                        <span class="step-check">✓</span>
+                    </div>
+                    <span class="step-label">Assessment</span>
+                </div>
+            </div>
+
+            <!-- Tab Navigation (shown in step 4) -->
+            <div class="tab-navigation" id="tabNavigation" style="display: none;">
+                <button class="tab-btn active" data-tab="assessment" onclick="switchTab('assessment')">
+                    <span class="tab-icon">📊</span>
+                    <span>Clinical Assessment</span>
+                </button>
+                <button class="tab-btn" data-tab="compliance" id="complianceTabBtn" onclick="switchTab('compliance')">
+                    <span class="tab-icon">💊</span>
+                    <span>Medication Compliance</span>
+                </button>
+            </div>
+
+            <!-- Tab Content Areas -->
+            <div class="tab-content active" id="assessmentTab">
+                <!-- Step 1: Patient Information -->
+                <div class="step-content active" id="step1">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Welcome to Your Health Check-In</h2>
+                            <p>Let's begin by verifying your identity</p>
+                        </div>
+                        <div class="card-body">
+                            <div class="input-group">
+                                <label for="patientId">Patient Identifier</label>
+                                <input 
+                                    type="text" 
+                                    id="patientId" 
+                                    placeholder="Enter your patient ID"
+                                    autocomplete="off"
+                                />
+                                <span class="input-hint">Provided by your healthcare provider</span>
+                            </div>
+                            <button class="btn btn-primary" onclick="startSession()">
+                                <span>Begin Session</span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                    <path d="M7 4l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Clinical Questions -->
+                <div class="step-content" id="step2">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Clinical Assessment Questions</h2>
+                            <p>Please review these questions carefully before recording</p>
+                        </div>
+                        <div class="card-body">
+                            <div class="questions-list">
+                                <div class="question-card">
+                                    <span class="q-number">Q1</span>
+                                    <p>How are you feeling today? Describe your mood and emotional state.</p>
+                                </div>
+                                <div class="question-card">
+                                    <span class="q-number">Q2</span>
+                                    <p>Have you been taking your medication as prescribed? Any missed doses?</p>
+                                </div>
+                                <div class="question-card">
+                                    <span class="q-number">Q3</span>
+                                    <p>Are you experiencing any side effects from your medication?</p>
+                                </div>
+                                <div class="question-card">
+                                    <span class="q-number">Q4</span>
+                                    <p>How has your sleep been this week? Any changes?</p>
+                                </div>
+                                <div class="question-card">
+                                    <span class="q-number">Q5</span>
+                                    <p>Is there anything else you'd like your healthcare provider to know?</p>
+                                </div>
+                            </div>
+                            <div class="button-group">
+                                <button class="btn btn-secondary" onclick="goToStep(1)">
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                        <path d="M13 16l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                    <span>Back</span>
+                                </button>
+                                <button class="btn btn-primary" onclick="goToStep(3)">
+                                    <span>Continue to Recording</span>
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                        <path d="M7 4l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Video Recording -->
+                <div class="step-content" id="step3">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Record Your Assessment</h2>
+                            <p>Answer all five questions in one continuous recording</p>
+                        </div>
+                        <div class="card-body">
+                            <div class="video-container">
+                                <video id="videoPreview" autoplay muted playsinline></video>
+                                <div class="recording-indicator" id="recordingIndicator" style="display: none;">
+                                    <span class="rec-dot"></span>
+                                    <span class="rec-text">Recording</span>
+                                    <span class="rec-time" id="recordingTime">00:00</span>
+                                </div>
+                            </div>
+                            <div class="controls">
+                                <button class="btn btn-record" id="startRecordBtn" onclick="startRecording()">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                        <circle cx="12" cy="12" r="8" fill="currentColor"/>
+                                    </svg>
+                                    <span>Start Recording</span>
+                                </button>
+                                <button class="btn btn-stop" id="stopRecordBtn" onclick="stopRecording()" style="display: none;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                        <rect x="7" y="7" width="10" height="10" fill="currentColor"/>
+                                    </svg>
+                                    <span>Stop Recording</span>
+                                </button>
+                            </div>
+                            <div class="recorded-preview" id="recordedPreview" style="display: none;">
+                                <video id="recordedVideo" controls></video>
+                                <div class="button-group">
+                                    <button class="btn btn-secondary" onclick="retakeVideo()">
+                                        <span>Retake</span>
+                                    </button>
+                                    <button class="btn btn-primary" onclick="uploadVideo()">
+                                        <span>Upload & Analyze</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4: Results & Analysis -->
+                <div class="step-content" id="step4">
+                    <!-- Upload Progress -->
+                    <div class="card" id="uploadingCard" style="display: none;">
+                        <div class="card-body text-center">
+                            <div class="upload-animation">
+                                <div class="spinner"></div>
+                            </div>
+                            <h3 id="uploadStatus">Uploading Video...</h3>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="uploadProgress"></div>
+                            </div>
+                            <p class="upload-subtitle" id="uploadSubtext">Please wait while we process your assessment</p>
+                        </div>
+                    </div>
+
+                    <!-- Results Display -->
+                    <div class="card" id="resultsCard" style="display: none;">
+                        <div class="card-body">
+                            <div class="success-animation">
+                                <svg class="checkmark" width="80" height="80" viewBox="0 0 80 80">
+                                    <circle class="checkmark-circle" cx="40" cy="40" r="35" fill="none" stroke="currentColor" stroke-width="4"/>
+                                    <path class="checkmark-check" d="M25 40 L35 50 L55 30" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                            <h2 class="text-center">Assessment Complete</h2>
+                            <p class="text-center text-muted">Your video has been successfully uploaded and analyzed</p>
+                            
+                            <div class="completion-checklist">
+                                <div class="check-item">
+                                    <span class="check-icon">✓</span>
+                                    <span>Video Recorded & Uploaded</span>
+                                </div>
+                                <div class="check-item">
+                                    <span class="check-icon">✓</span>
+                                    <span>Clinical Questions Answered</span>
+                                </div>
+                                <div class="check-item">
+                                    <span class="check-icon">✓</span>
+                                    <span>Analysis Processing Complete</span>
+                                </div>
+                            </div>
+
+                            <div class="next-step-card">
+                                <h3>Next Step: Medication Compliance</h3>
+                                <p>Please complete the medication compliance verification to finish your check-in</p>
+                                <button class="btn btn-primary btn-large" onclick="openPillCompliance()">
+                                    <span>Start Compliance Check</span>
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                        <path d="M7 4l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div class="job-info">
+                                <span>Job ID: <code id="jobId"></code></span>
+                                <span>Processing Time: <span id="processingTime"></span>s</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compliance Tab Content -->
+            <div class="tab-content" id="complianceTab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Medication Compliance Verification</h2>
+                        <p>Real-time pill detection protocol with camera</p>
+                    </div>
+                    <div class="card-body">
+                        <div id="complianceLoadingMessage" style="display: none; text-align: center; padding: 40px;">
+                            <div class="spinner"></div>
+                            <p>Loading compliance check...</p>
+                            <p style="font-size: 0.875rem; color: var(--text-muted);">Connecting to camera system on port 5001</p>
+                        </div>
+                        <iframe 
+                            id="complianceFrame" 
+                            src="" 
+                            frameborder="0" 
+                            allowfullscreen
+                            allow="camera *; microphone *"
+                            sandbox="allow-same-origin allow-scripts allow-forms"
+                        ></iframe>
+                        
+                        <!-- Compliance Completion Section -->
+                        <div id="complianceCompletionSection" style="display: none; text-align: center; padding: 40px; margin-top: 20px; background: var(--bg-cream); border-radius: 12px;">
+                            <div class="success-icon" style="font-size: 4rem; margin-bottom: 20px;">
+                                ✅
+                            </div>
+                            <h2 style="color: var(--primary); margin-bottom: 10px;">All Steps Complete!</h2>
+                            <p style="color: var(--text-muted); margin-bottom: 30px;">
+                                You have successfully completed both clinical assessment and medication compliance verification.
+                            </p>
+                            
+                            <div class="completion-summary" style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 30px; text-align: left;">
+                                <h3 style="margin-bottom: 15px; color: var(--primary);">Session Summary</h3>
+                                <div style="display: flex; flex-direction: column; gap: 10px;">
+                                    <div class="summary-item" style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="color: var(--success); font-size: 1.2rem;">✓</span>
+                                        <span>Clinical Questions Completed</span>
+                                    </div>
+                                    <div class="summary-item" style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="color: var(--success); font-size: 1.2rem;">✓</span>
+                                        <span>Video Assessment Analyzed</span>
+                                    </div>
+                                    <div class="summary-item" style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="color: var(--success); font-size: 1.2rem;">✓</span>
+                                        <span>Medication Compliance Verified (6 Phases)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button class="btn btn-primary btn-large" onclick="completeSession()" style="margin-bottom: 15px;">
+                                <span>Finish & Submit</span>
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                    <path d="M16 4L6 14l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                            </button>
+                            
+                            <p style="font-size: 0.875rem; color: var(--text-muted);">
+                                Session ID: <code id="finalSessionId">---</code>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app-new.js"></script>
+</body>
+</html>

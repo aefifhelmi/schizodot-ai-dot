@@ -1,0 +1,93 @@
+# ============================================
+# Docker Ignore - Pill Detection API
+# ============================================
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+tests/
+test_*.py
+*_test.py
+pytest.ini
+.pytest_cache/
+
+# Documentation (exclude from image, not needed at runtime)
+*.md
+docs/
+
+# Node.js (if frontend exists)
+node_modules/
+npm-debug.log
+package-lock.json
+bun.lockb
+
+# Frontend build files (not needed for API)
+src/
+public/
+index.html
+*.config.js
+*.config.ts
+tsconfig*.json
+eslint.config.js
+tailwind.config.ts
+components.json
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Scripts (not needed in container)
+*.sh
+build.sh
+run.sh
+push.sh
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Patient reports (generated at runtime)
+patient_report/
+
+# Other Python files not needed for production
+realtime_protocol.py
+proto.py
+test_realtime.py
+
+# Keep only:
+# - simple_detector.py
+# - api_service.py
+# - models/
+# - requirements-production.txt

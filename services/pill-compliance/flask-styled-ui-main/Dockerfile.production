@@ -1,0 +1,82 @@
+# ============================================
+# Production Dockerfile - Pill Detection API
+# ============================================
+# Multi-stage build for optimized image size
+# Base: Python 3.10 slim with PyTorch CPU
+
+FROM python:3.10-slim AS base
+
+# Metadata
+LABEL maintainer="your-email@example.com"
+LABEL service="pill-detection-api"
+LABEL version="1.0.0"
+
+WORKDIR /app
+
+# Install system dependencies (minimal set for OpenCV, MediaPipe, PyTorch CPU)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # OpenCV dependencies
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libgomp1 \
+    libgl1-mesa-glx \
+    # MediaPipe dependencies
+    libglib2.0-0 \
+    # Video processing
+    ffmpeg \
+    # Cleanup
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# ============================================
+# Build stage: Install Python dependencies
+# ============================================
+FROM base AS builder
+
+# Copy requirements with pinned versions
+COPY requirements-production.txt /tmp/requirements.txt
+
+# Install dependencies to /install
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir --prefix=/install -r /tmp/requirements.txt
+
+# ============================================
+# Runtime stage: Minimal production image
+# ============================================
+FROM base AS runtime
+
+# Copy installed packages from builder
+COPY --from=builder /install /usr/local
+
+# Create non-root user for security
+RUN useradd -m -u 1000 -s /bin/bash appuser && \
+    mkdir -p /app/models /app/tmp && \
+    chown -R appuser:appuser /app
+
+# Copy application code
+COPY --chown=appuser:appuser simple_detector.py /app/
+COPY --chown=appuser:appuser api_service.py /app/
+COPY --chown=appuser:appuser models/ /app/models/
+
+# Switch to non-root user
+USER appuser
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    MODEL_PATH=/app/models/best.pt \
+    DEVICE=cpu \
+    TORCH_LOAD_WEIGHTS_ONLY=0 \
+    PORT=8003
+
+# Expose API port
+EXPOSE 8003
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8003/health').read()" || exit 1
+
+# Run FastAPI with Uvicorn
+CMD ["python", "-m", "uvicorn", "api_service:app", "--host", "0.0.0.0", "--port", "8003", "--workers", "1"]

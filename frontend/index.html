@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Schizodot Uploader</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; }
+      label, input, button { display: block; margin-bottom: 1rem; }
+      .log { background: #f5f5f5; padding: 1rem; border-radius: 6px; white-space: pre-wrap; }
+      .ok { color: green; }
+      .err { color: red; }
+    </style>
+  </head>
+  <body>
+    <h1>Schizodot – Test Upload</h1>
+    <p>Upload a file → FastAPI → S3 → DynamoDB</p>
+
+    <label>
+      Patient ID
+      <input id="patientId" value="patient002" />
+    </label>
+
+    <label>
+      Choose file
+      <input id="fileInput" type="file" accept="audio/*,video/*" />
+    </label>
+
+    <button id="uploadBtn">Upload</button>
+
+    <h2>Status</h2>
+    <div id="status" class="log">Idle…</div>
+
+    <script>
+      const API_BASE = "http://127.0.0.1:8000/api/v1/analyze";
+      const statusBox = document.getElementById("status");
+      const uploadBtn = document.getElementById("uploadBtn");
+      const fileInput = document.getElementById("fileInput");
+      const patientInput = document.getElementById("patientId");
+
+      function log(msg, isErr = false) {
+        statusBox.textContent = msg;
+        statusBox.className = "log " + (isErr ? "err" : "ok");
+      }
+
+      async function doUpload() {
+        const file = fileInput.files[0];
+        const patientId = patientInput.value.trim();
+        if (!file) {
+          log("Please choose a file first", true);
+          return;
+        }
+        if (!patientId) {
+          log("Please enter patient ID", true);
+          return;
+        }
+
+        // 1) ask FastAPI to give presigned URL
+        log("1/4 Getting presigned URL from FastAPI…");
+        const presignUrl = `${API_BASE}/presign/${encodeURIComponent(patientId)}?filename=${encodeURIComponent(file.name)}&content_type=${encodeURIComponent(file.type)}`;
+        const presignResp = await fetch(presignUrl);
+        if (!presignResp.ok) {
+          const txt = await presignResp.text();
+          log("Presign failed: " + txt, true);
+          return;
+        }
+        const presignData = await presignResp.json();
+        const { url, key } = presignData;
+
+        // 2) upload to S3 using presigned URL
+        log("2/4 Uploading directly to S3…");
+        const putResp = await fetch(url, {
+          method: "PUT",
+          headers: {
+            "Content-Type": file.type,
+          },
+          body: file,
+        });
+        if (!putResp.ok) {
+          const txt = await putResp.text();
+          log("S3 upload failed: " + txt, true);
+          return;
+        }
+
+        // 3) tell backend to confirm and write to Dynamo
+        log("3/4 Telling FastAPI to confirm + log to DynamoDB…");
+        const confirmResp = await fetch(`${API_BASE}/confirm`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            patient_id: patientId,
+            key: key,
+            size_bytes: file.size,
+            media_type: file.type,
+          }),
+        });
+        if (!confirmResp.ok) {
+          const txt = await confirmResp.text();
+          log("Confirm failed: " + txt, true);
+          return;
+        }
+        const confirmData = await confirmResp.json();
+
+        // 4) done
+        log("4/4 Done ✅\n\nS3 key: " + key + "\nDynamo item:\n" + JSON.stringify(confirmData, null, 2));
+      }
+
+      uploadBtn.addEventListener("click", () => {
+        doUpload().catch(err => {
+          console.error(err);
+          log("Unexpected error: " + err.message, true);
+        });
+      });
+    </script>
+  </body>
+</html>

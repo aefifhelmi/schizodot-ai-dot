@@ -1,0 +1,75 @@
+# ============================================
+# STAGE 1: Builder
+# ============================================
+FROM python:3.10-slim as builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    make \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY backend/app/requirements.txt .
+
+# Create virtual environment and install Python dependencies
+RUN python -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# ============================================
+# STAGE 2: Runtime
+# ============================================
+FROM python:3.10-slim
+
+# Set metadata
+LABEL maintainer="SchizoDot AI Team"
+LABEL description="Celery worker for background task processing"
+LABEL version="1.0.0"
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PATH=/opt/venv/bin:$PATH \
+    PYTHONPATH=/app \
+    C_FORCE_ROOT=true
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -u 1000 celeryuser && \
+    mkdir -p /app /uploads /logs && \
+    chown -R celeryuser:celeryuser /app /uploads /logs
+
+WORKDIR /app
+
+# Copy Python dependencies from builder
+COPY --from=builder --chown=celeryuser:celeryuser /opt/venv /opt/venv
+
+# Copy application code
+COPY --chown=celeryuser:celeryuser backend/app /app
+
+# Switch to non-root user
+USER celeryuser
+
+# Health check - check if worker is responding
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD celery -A worker.celery_app inspect ping -d celery@$HOSTNAME || exit 1
+
+# Default command: Start Celery worker
+CMD ["celery", "-A", "worker.celery_app", "worker", \
+     "--loglevel=info", \
+     "--concurrency=2", \
+     "--max-tasks-per-child=100", \
+     "--time-limit=600", \
+     "--soft-time-limit=540"]

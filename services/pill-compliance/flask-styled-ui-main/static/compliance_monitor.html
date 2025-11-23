@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medication Compliance Monitor</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 900px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        
+        #video, #canvas {
+            width: 100%;
+            display: block;
+        }
+        
+        .status-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .status-label {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .status-value {
+            color: #667eea;
+        }
+        
+        .phase-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        
+        .phase {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+            margin: 0 5px;
+            transition: all 0.3s;
+        }
+        
+        .phase.active {
+            background: #667eea;
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .phase.complete {
+            background: #28a745;
+            color: white;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .btn-disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .message {
+            text-align: center;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 Medication Compliance Monitor</h1>
+        <p class="subtitle">Real-time verification protocol</p>
+        
+        <!-- Phase Indicators -->
+        <div class="phase-indicator">
+            <div class="phase" id="phase1">Phase 1<br><small>Hold Pill</small></div>
+            <div class="phase" id="phase2">Phase 2<br><small>Open Mouth</small></div>
+            <div class="phase" id="phase3">Phase 3<br><small>On Tongue</small></div>
+            <div class="phase" id="phase4">Phase 4<br><small>Close Mouth</small></div>
+            <div class="phase" id="phase5">Phase 5<br><small>Reopen</small></div>
+            <div class="phase" id="phase6">Phase 6<br><small>Verify</small></div>
+        </div>
+        
+        <!-- Video Feed -->
+        <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas" class="hidden"></canvas>
+        </div>
+        
+        <!-- Status Panel -->
+        <div class="status-panel">
+            <div class="status-row">
+                <span class="status-label">Status:</span>
+                <span class="status-value" id="status">Not Started</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Current Phase:</span>
+                <span class="status-value" id="currentPhase">-</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Instructions:</span>
+                <span class="status-value" id="message">Click Start to begin</span>
+            </div>
+        </div>
+        
+        <!-- Messages -->
+        <div id="messageBox" class="hidden"></div>
+        
+        <!-- Controls -->
+        <div class="controls">
+            <button id="startBtn" class="btn-primary" onclick="startSession()">
+                Start Protocol
+            </button>
+            <button id="stopBtn" class="btn-danger hidden" onclick="stopSession()">
+                Stop
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const SOCKET_URL = window.location.protocol + '//' + window.location.hostname + ':8004';
+        let socket;
+        let video;
+        let canvas;
+        let ctx;
+        let streaming = false;
+        let patientId = 'PATIENT-' + Date.now();
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+            
+            // Connect to WebSocket
+            socket = io(SOCKET_URL);
+            
+            socket.on('connect', () => {
+                console.log('Connected to compliance monitor');
+                showMessage('Connected to server', 'success');
+            });
+            
+            socket.on('session_started', (data) => {
+                console.log('Session started:', data);
+                showMessage('Session started! Follow the on-screen instructions.', 'info');
+                streaming = true;
+                streamFrames();
+            });
+            
+            socket.on('frame_result', (data) => {
+                updateStatus(data.status);
+            });
+            
+            socket.on('protocol_complete', (data) => {
+                streaming = false;
+                if (data.result === 'success') {
+                    showMessage('✅ COMPLIANCE VERIFIED! Protocol completed successfully.', 'success');
+                    document.getElementById('status').textContent = 'VERIFIED (PASS)';
+                } else {
+                    showMessage('❌ Verification failed: ' + data.reason, 'error');
+                    document.getElementById('status').textContent = 'FAILED';
+                }
+                
+                document.getElementById('startBtn').classList.remove('hidden', 'btn-disabled');
+                document.getElementById('stopBtn').classList.add('hidden');
+            });
+            
+            socket.on('error', (data) => {
+                console.error('Error:', data);
+                showMessage('Error: ' + data.message, 'error');
+            });
+        });
+        
+        async function startSession() {
+            try {
+                // Request camera access
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 640, height: 480 } 
+                });
+                
+                video.srcObject = stream;
+                canvas.width = 640;
+                canvas.height = 480;
+                
+                // Start session
+                socket.emit('start_session', {
+                    patient_id: patientId,
+                    session_id: 'session-' + Date.now()
+                });
+                
+                document.getElementById('startBtn').classList.add('hidden');
+                document.getElementById('stopBtn').classList.remove('hidden');
+                
+            } catch (err) {
+                showMessage('Camera access denied: ' + err.message, 'error');
+            }
+        }
+        
+        function stopSession() {
+            streaming = false;
+            socket.emit('stop_session');
+            
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            
+            document.getElementById('startBtn').classList.remove('hidden');
+            document.getElementById('stopBtn').classList.add('hidden');
+            document.getElementById('status').textContent = 'Stopped';
+            resetPhases();
+        }
+        
+        function streamFrames() {
+            if (!streaming) return;
+            
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const frameData = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+            
+            socket.emit('process_frame', { frame: frameData });
+            
+            setTimeout(streamFrames, 100); // 10 FPS
+        }
+        
+        function updateStatus(status) {
+            document.getElementById('currentPhase').textContent = `Phase ${status.phase}`;
+            document.getElementById('message').textContent = status.message || status.status_text;
+            document.getElementById('status').textContent = status.status;
+            
+            // Update phase indicators
+            for (let i = 1; i <= 6; i++) {
+                const phaseEl = document.getElementById(`phase${i}`);
+                if (i < status.phase) {
+                    phaseEl.classList.remove('active');
+                    phaseEl.classList.add('complete');
+                } else if (i === status.phase) {
+                    phaseEl.classList.add('active');
+                    phaseEl.classList.remove('complete');
+                } else {
+                    phaseEl.classList.remove('active', 'complete');
+                }
+            }
+        }
+        
+        function showMessage(msg, type) {
+            const msgBox = document.getElementById('messageBox');
+            msgBox.textContent = msg;
+            msgBox.className = `message ${type}`;
+            msgBox.classList.remove('hidden');
+            
+            setTimeout(() => {
+                msgBox.classList.add('hidden');
+            }, 5000);
+        }
+        
+        function resetPhases() {
+            for (let i = 1; i <= 6; i++) {
+                document.getElementById(`phase${i}`).className = 'phase';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+# Placeholder for dependency injection later (e.g., repository impls)
+# from app.repositories.dynamo_items import DynamoItemsRepo
+# async def get_items_repo() -> ItemsRepository: ...

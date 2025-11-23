@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test - Schizodot AI</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        h1 { color: #1e293b; }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover { background: #4f46e5; }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f1f5f9;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .info { color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Schizodot AI - API Test Page</h1>
+    
+    <div class="test-section">
+        <h3>1. Test Backend Connectivity</h3>
+        <button onclick="testBackend()">Test Backend API</button>
+        <div id="backendResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>2. Test Job Creation</h3>
+        <button onclick="testJobCreation()">Create Test Job</button>
+        <div id="jobResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>3. Test Complete Upload Flow</h3>
+        <button onclick="testCompleteFlow()">Test Full Upload Flow</button>
+        <div id="uploadResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000/api/v1';
+
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            element.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            element.scrollTop = element.scrollHeight;
+        }
+
+        async function testBackend() {
+            const resultDiv = document.getElementById('backendResult');
+            resultDiv.innerHTML = '';
+            
+            try {
+                log('backendResult', '🔍 Testing backend connectivity...', 'info');
+                
+                // Test root endpoint
+                const response = await fetch('http://localhost:8000/');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log('backendResult', `✅ Backend is UP: ${JSON.stringify(data)}`, 'success');
+                } else {
+                    log('backendResult', `❌ Backend returned error: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log('backendResult', `❌ Backend connection failed: ${error.message}`, 'error');
+                log('backendResult', '💡 Make sure Docker services are running', 'info');
+            }
+        }
+
+        async function testJobCreation() {
+            const resultDiv = document.getElementById('jobResult');
+            resultDiv.innerHTML = '';
+            
+            try {
+                log('jobResult', '🚀 Creating test job...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/analyze/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        patient_id: 'TEST-WEB-001',
+                        filename: `test-${Date.now()}.webm`,
+                        content_type: 'video/webm',
+                        metadata: {
+                            test: true,
+                            source: 'test_page'
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log('jobResult', `✅ Job created successfully!`, 'success');
+                    log('jobResult', `📋 Job ID: ${data.job_id}`, 'info');
+                    log('jobResult', `🔗 S3 Key: ${data.s3_key}`, 'info');
+                    log('jobResult', `🔗 Presigned URL: ${data.presigned_url.substring(0, 80)}...`, 'info');
+                } else {
+                    log('jobResult', `❌ Job creation failed: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                log('jobResult', `❌ Request failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCompleteFlow() {
+            const resultDiv = document.getElementById('uploadResult');
+            resultDiv.innerHTML = '';
+            
+            try {
+                // Step 1: Create a dummy video blob
+                log('uploadResult', '📹 Creating test video blob...', 'info');
+                const dummyBlob = new Blob(['test video content'], { type: 'video/webm' });
+                log('uploadResult', `✅ Blob created (${dummyBlob.size} bytes)`, 'success');
+                
+                // Step 2: Create job
+                log('uploadResult', '🚀 Creating job...', 'info');
+                const jobResponse = await fetch(`${API_BASE_URL}/analyze/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        patient_id: 'TEST-UPLOAD-001',
+                        filename: `test-upload-${Date.now()}.webm`,
+                        content_type: 'video/webm'
+                    })
+                });
+                
+                if (!jobResponse.ok) {
+                    const errorData = await jobResponse.json();
+                    throw new Error(`Job creation failed: ${JSON.stringify(errorData)}`);
+                }
+                
+                const jobData = await jobResponse.json();
+                log('uploadResult', `✅ Job created: ${jobData.job_id}`, 'success');
+                
+                // Step 3: Upload to S3
+                log('uploadResult', '📤 Uploading to S3...', 'info');
+                const uploadResponse = await fetch(jobData.presigned_url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'video/webm'
+                    },
+                    body: dummyBlob
+                });
+                
+                if (uploadResponse.ok) {
+                    log('uploadResult', `✅ Upload successful! (${uploadResponse.status})`, 'success');
+                    log('uploadResult', `🎉 Complete flow working!`, 'success');
+                } else {
+                    const errorText = await uploadResponse.text();
+                    log('uploadResult', `❌ Upload failed: ${uploadResponse.status} - ${errorText}`, 'error');
+                }
+                
+            } catch (error) {
+                log('uploadResult', `❌ Flow test failed: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

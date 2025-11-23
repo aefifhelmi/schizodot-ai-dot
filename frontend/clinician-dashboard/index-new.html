@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOMINO Clinical Intelligence Platform</title>
+    <link rel="stylesheet" href="styles-new.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Epilogue:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Grid Background -->
+    <div class="grid-bg"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-grid">
+                <div class="logo-section">
+                    <div class="logo">
+                        <svg class="logo-glyph" width="40" height="40" viewBox="0 0 40 40">
+                            <rect x="2" y="2" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="20" cy="12" r="4" fill="currentColor"/>
+                            <circle cx="12" cy="20" r="3" fill="currentColor"/>
+                            <circle cx="28" cy="20" r="3" fill="currentColor"/>
+                            <circle cx="20" cy="28" r="2.5" fill="currentColor"/>
+                            <line x1="20" y1="16" x2="20" y2="25.5" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
+                        <div class="logo-text">
+                            <span class="logo-primary">DOMINO</span>
+                            <span class="logo-sub">Clinical Intelligence</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="status-bar">
+                    <div class="status-item">
+                        <span class="status-dot status-active"></span>
+                        <span class="status-label">System Online</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="mono-text" id="connectionStatus">Connected</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Interface -->
+    <main class="main">
+        <div class="container">
+            <!-- Control Panel -->
+            <div class="control-panel">
+                <div class="panel-header">
+                    <h1 class="panel-title">Patient Assessment Monitor</h1>
+                    <div class="panel-actions">
+                        <button class="btn-icon" onclick="refreshData()" title="Refresh">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                            </svg>
+                        </button>
+                        <button class="btn-icon" onclick="toggleView()" title="Toggle View">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search & Filter -->
+                <div class="search-section">
+                    <div class="input-container">
+                        <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                        </svg>
+                        <input 
+                            type="text" 
+                            id="patientSearch" 
+                            class="search-input" 
+                            placeholder="Search by Patient ID..."
+                            onkeyup="filterPatients()"
+                        />
+                    </div>
+                    <button class="btn-primary" onclick="loadPatientData()">
+                        <span>Load Assessment</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="m9 18 6-6-6-6"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Patient List Sidebar -->
+            <div class="patient-list-panel" id="patientListPanel">
+                <div class="list-header">
+                    <h3>All Patients</h3>
+                    <span class="patient-count" id="patientCount">0</span>
+                </div>
+                <div class="patient-list" id="patientList">
+                    <div class="list-loading">Loading patients...</div>
+                </div>
+            </div>
+
+            <!-- Data Display Grid -->
+            <div class="data-grid" id="dataGrid">
+                <!-- Loading State -->
+                <div class="loading-panel" id="loadingPanel">
+                    <div class="loading-animation">
+                        <div class="loading-spinner"></div>
+                        <div class="loading-bars">
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                            <div class="bar"></div>
+                        </div>
+                    </div>
+                    <p class="loading-text">Initializing system...</p>
+                    <p class="mono-text loading-sub">Awaiting patient data input</p>
+                </div>
+
+                <!-- Results View -->
+                <div class="results-container" id="resultsContainer" style="display: none;">
+                    <!-- Patient Header Card -->
+                    <div class="data-card card-header-info">
+                        <div class="card-label">PATIENT INFORMATION</div>
+                        <div class="patient-header-grid">
+                            <div class="info-block">
+                                <div class="info-label">Patient ID</div>
+                                <div class="info-value mono-text" id="displayPatientId">---</div>
+                            </div>
+                            <div class="info-block">
+                                <div class="info-label">Job ID</div>
+                                <div class="info-value mono-text" id="displayJobId">---</div>
+                            </div>
+                            <div class="info-block">
+                                <div class="info-label">Timestamp</div>
+                                <div class="info-value mono-text" id="displayTimestamp">---</div>
+                            </div>
+                            <div class="info-block">
+                                <div class="info-label">Status</div>
+                                <div class="status-badge" id="displayStatus">
+                                    <span class="status-dot status-success"></span>
+                                    <span>Complete</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Dashboard -->
+                    <div class="metrics-row">
+                        <!-- Emotion Analysis -->
+                        <div class="data-card card-metric">
+                            <div class="card-label">MULTIMODAL EMOTION</div>
+                            <div class="metric-display">
+                                <div class="metric-value" id="fusedEmotion">---</div>
+                                <div class="metric-confidence" id="fusedConfidence">0%</div>
+                            </div>
+                            <div class="metric-breakdown">
+                                <div class="breakdown-item">
+                                    <span class="breakdown-label">Audio:</span>
+                                    <span class="breakdown-value" id="audioEmotion">---</span>
+                                </div>
+                                <div class="breakdown-item">
+                                    <span class="breakdown-label">Facial:</span>
+                                    <span class="breakdown-value" id="facialEmotion">---</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Risk Assessment -->
+                        <div class="data-card card-metric">
+                            <div class="card-label">RISK ASSESSMENT</div>
+                            <div class="metric-display">
+                                <div class="metric-value" id="riskLevel">---</div>
+                                <div class="metric-indicator" id="riskIndicator">
+                                    <div class="indicator-bar"></div>
+                                </div>
+                            </div>
+                            <div class="metric-tags" id="riskFactors"></div>
+                        </div>
+
+                        <!-- Compliance Score -->
+                        <div class="data-card card-metric">
+                            <div class="card-label">MEDICATION COMPLIANCE</div>
+                            <div class="metric-display">
+                                <div class="metric-value" id="complianceScore">---</div>
+                                <div class="metric-progress">
+                                    <div class="progress-track">
+                                        <div class="progress-fill" id="complianceFill"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="metric-breakdown">
+                                <div class="breakdown-item">
+                                    <span class="breakdown-label">Protocol:</span>
+                                    <span class="breakdown-value" id="protocolStatus">Pending</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detailed Analysis Tabs -->
+                    <div class="data-card card-tabbed">
+                        <div class="tab-bar">
+                            <button class="tab-item active" data-tab="clinical" onclick="switchAnalysisTab('clinical')">
+                                <span>Clinical Summary</span>
+                            </button>
+                            <button class="tab-item" data-tab="emotion" onclick="switchAnalysisTab('emotion')">
+                                <span>Emotion Analysis</span>
+                            </button>
+                            <button class="tab-item" data-tab="transcript" onclick="switchAnalysisTab('transcript')">
+                                <span>Transcript</span>
+                            </button>
+                            <button class="tab-item" data-tab="raw" onclick="switchAnalysisTab('raw')">
+                                <span>Raw Data</span>
+                            </button>
+                        </div>
+
+                        <div class="tab-content-area">
+                            <!-- Clinical Tab -->
+                            <div class="tab-panel active" id="clinicalTab">
+                                <div class="analysis-section">
+                                    <h3 class="section-title">Clinical Summary</h3>
+                                    <div class="text-content" id="clinicalSummary">Loading...</div>
+                                </div>
+                                <div class="analysis-section">
+                                    <h3 class="section-title">Recommendations</h3>
+                                    <div class="recommendations-list" id="recommendations"></div>
+                                </div>
+                            </div>
+
+                            <!-- Emotion Tab -->
+                            <div class="tab-panel" id="emotionTab">
+                                <div class="emotion-grid">
+                                    <div class="emotion-panel">
+                                        <h4 class="panel-subtitle">Audio Emotion</h4>
+                                        <div class="emotion-data" id="audioEmotionData"></div>
+                                    </div>
+                                    <div class="emotion-panel">
+                                        <h4 class="panel-subtitle">Facial Emotion</h4>
+                                        <div class="emotion-data" id="facialEmotionData"></div>
+                                    </div>
+                                    <div class="emotion-panel span-2">
+                                        <h4 class="panel-subtitle">Multimodal Fusion</h4>
+                                        <div class="emotion-data" id="fusedEmotionData"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Transcript Tab -->
+                            <div class="tab-panel" id="transcriptTab">
+                                <div class="transcript-container">
+                                    <div class="transcript-text" id="transcriptText">Loading transcript...</div>
+                                </div>
+                            </div>
+
+                            <!-- Raw Data Tab -->
+                            <div class="tab-panel" id="rawTab">
+                                <pre class="code-block" id="rawDataDisplay">{ "loading": true }</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Notification Toast -->
+    <div class="notification-stack" id="notificationStack"></div>
+
+    <script src="app-new.js"></script>
+</body>
+</html>
