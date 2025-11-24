@@ -2,6 +2,20 @@
 
 AI-powered Digital Observation Therapy Platform for Mental Health Assessment
 
+## 👥 Team - Pulse & Code
+
+**Universiti Teknologi MARA (UiTM)**
+
+### Development Team
+- **Tengku Afif Helmi Bin Tengku Shahrulizam** 
+- **Muhammad Zahin Bin Mohd Zulflida** 
+- **Ishaza Arianna Binti Ismadee Asmara** 
+
+### Medical Advisory Team
+- **Nur Liyana Binti Zuraimi** 
+- **Mumtazah Aiesyah Binti Hassan** 
+- **Muhammad Ammer Haziq Bin Johari** 
+
 ## 🏗️ Project Structure
 
 ```
@@ -141,20 +155,6 @@ See [LICENSE](LICENSE) file for details.
 2. Make changes
 3. Run tests
 4. Submit pull request
-
-## 👥 Team - Pulse & Code
-
-**Universiti Teknologi MARA (UiTM)**
-
-### Development Team
-- **Tengku Afif Helmi Bin Tengku Shahrulizam** 
-- **Muhammad Zahin Bin Mohd Zulflida** 
-- **Ishaza Arianna Binti Ismadee Asmara** 
-
-### Medical Advisory Team
-- **Nur Liyana Binti Zuraimi** 
-- **Mumtazah Aiesyah Binti Hassan** 
-- **Muhammad Ammer Haziq Bin Johari** 
 
 ---
 
