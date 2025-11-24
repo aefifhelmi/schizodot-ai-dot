@@ -1,4 +1,4 @@
-# DOMINO - Digital Observation & Monitoring Intelligence for Neuro-psychiatric Oversight
+# DOMINO - Digital Observation & Monitoring Intelligence for Neuro-Output
 
 AI-powered Digital Observation Therapy Platform for Mental Health Assessment
 
