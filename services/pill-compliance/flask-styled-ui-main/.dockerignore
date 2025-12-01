@@ -83,11 +83,12 @@ patient_report/
 
 # Other Python files not needed for production
 realtime_protocol.py
-proto.py
 test_realtime.py
 
-# Keep only:
+# Keep:
 # - simple_detector.py
 # - api_service.py
+# - proto.py (needed for proto-compliance service)
 # - models/
 # - requirements-production.txt
+# - requirements-proto.txt

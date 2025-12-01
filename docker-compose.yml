@@ -188,7 +188,7 @@ services:
   # ============================================
   pill-detection:
     build:
-      context: ./flask-styled-ui-main
+      context: ./services/pill-compliance/flask-styled-ui-main
       dockerfile: Dockerfile.pilldetection
     container_name: schizodot-pill-detection
     ports:
@@ -198,7 +198,7 @@ services:
       - DEVICE=cpu
       - TORCH_LOAD_WEIGHTS_ONLY=0
     volumes:
-      - ./flask-styled-ui-main/models:/app/models:ro
+      - ./services/pill-compliance/flask-styled-ui-main/models:/app/models:ro
       - ./uploads:/uploads
       - ./logs:/logs
     networks:
@@ -216,7 +216,7 @@ services:
   # ============================================
   proto-compliance:
     build:
-      context: ./flask-styled-ui-main
+      context: ./services/pill-compliance/flask-styled-ui-main
       dockerfile: Dockerfile.proto
     container_name: schizodot-proto-compliance
     ports:
@@ -224,8 +224,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     volumes:
-      - ./flask-styled-ui-main/models:/app/models:ro
-      - ./flask-styled-ui-main/patient_report:/app/patient_report
+      - ./services/pill-compliance/flask-styled-ui-main/models:/app/models:ro
+      - ./services/pill-compliance/flask-styled-ui-main/patient_report:/app/patient_report
     networks:
       - schizodot-network
     restart: unless-stopped
