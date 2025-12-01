@@ -152,7 +152,7 @@ services:
   # ============================================
   emotion-service:
     build:
-      context: ./services/emotion-detection
+      context: ./services/emotion-detection/schizodot_emotion_demo
       dockerfile: infra/docker/emotion.Dockerfile
     image: schizodot-emotion:latest
     container_name: schizodot-emotion
@@ -168,8 +168,8 @@ services:
       - QT_QPA_PLATFORM=offscreen
       - DISPLAY=
     volumes:
-      # Mount model weights as read-only
-      - ./services/emotion-detection/ai/emotion/weights:/app/ai/emotion/weights:ro
+      # Mount model weights as read-only (correct path with weights)
+      - ./services/emotion-detection/schizodot_emotion_demo/ai/emotion/weights:/app/ai/emotion/weights:ro
       # Mount uploads and logs for persistence
       - ./uploads:/uploads
       - ./logs:/logs

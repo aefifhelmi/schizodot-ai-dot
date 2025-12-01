@@ -1,0 +1,7 @@
+{
+    "timestamp": "20251123_231402",
+    "final_status": "RUNNING",
+    "current_phase_at_end": 2,
+    "protocol_duration_approx_seconds": 1020.9599999999999,
+    "yolo_model_path": "models/best.pt"
+}
