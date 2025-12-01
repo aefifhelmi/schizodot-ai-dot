@@ -215,13 +215,11 @@ __marimo__/
 .env.*.local
 
 # Docker volumes and data
-uploads/
-logs/
+uploads/*
+!uploads/.gitkeep
+logs/*
+!logs/.gitkeep
 ai_models/cache/
-*.pth
-*.pt
-*.onnx
-*.h5
 
 # AWS credentials (should never be committed)
 .aws/
@@ -232,9 +230,14 @@ tmp/
 temp/
 *.tmp
 
-# Model weights (use Git LFS if needed)
-*.bin
-*.safetensors
+# Large model weights - exclude by default, but allow specific tracked ones
+# Use 'git add -f <file>' to force-add specific model files
+# *.pth
+# *.pt
+# *.onnx
+# *.h5
+# *.bin
+# *.safetensors
 
 # Database dumps
 *.db
